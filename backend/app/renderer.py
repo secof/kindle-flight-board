@@ -146,28 +146,34 @@ class BoardRenderer:
         draw.text((max_width // 2, max_height // 2), text, fill=(0, 0, 0, 255), font=self._font_row_medium, anchor="mm")
         return badge.convert("L")
 
-    def _draw_plane_icon(self, draw: ImageDraw.ImageDraw, x: int, y: int, w: int, h: int, flight_type: str):
-        """Draw clean, universal airplane taking off (DEP) or landing (ARR) vector icon without box or label."""
-        is_dep = (flight_type == "DEP")
-        
-        # Baseline runway
-        draw.line([(x + 2, y + h - 4), (x + w - 2, y + h - 4)], fill=0, width=5)
-        
-        if is_dep:
-            # Airplane taking off (angled 30 deg up-right)
-            draw.line([(x + 10, y + h - 18), (x + w - 10, y + 16)], fill=0, width=8)
-            cx, cy = x + w // 2 + 2, y + h // 2 - 2
-            draw.line([(cx - 8, cy - 14), (cx + 10, cy + 12)], fill=0, width=7)
-            draw.line([(x + 14, y + h - 16), (x + 18, y + h - 34)], fill=0, width=6)
-        else:
-            # Airplane landing (angled 30 deg down-right)
-            draw.line([(x + 10, y + 16), (x + w - 10, y + h - 18)], fill=0, width=8)
-            cx, cy = x + w // 2 + 2, y + h // 2 - 2
-            draw.line([(cx - 8, cy + 14), (cx + 10, cy - 12)], fill=0, width=7)
-            draw.line([(x + 14, y + 16), (x + 18, y + 34)], fill=0, width=6)
+    def _load_plane_icon(self, flight_type: str, max_width: int, max_height: int) -> Image.Image:
+        """Load departure.png or landing.png from assets/plane/ and render onto solid white background."""
+        filename = "departure.png" if flight_type == "DEP" else "landing.png"
+        icon_path = settings.ASSETS_DIR / "plane" / filename
+
+        if icon_path.exists():
+            try:
+                icon_img = Image.open(icon_path).convert("RGBA")
+                icon_img.thumbnail((max_width, max_height), Image.Resampling.LANCZOS)
+
+                # Solid white canvas (alpha=255) to prevent eips transparency bleed-through
+                canvas = Image.new("RGBA", (max_width, max_height), (255, 255, 255, 255))
+                offset_x = (max_width - icon_img.width) // 2
+                offset_y = (max_height - icon_img.height) // 2
+                canvas.paste(icon_img, (offset_x, offset_y), icon_img)
+                return canvas.convert("L")
+            except Exception as e:
+                logger.warning("Failed to load plane icon %s: %s", icon_path, str(e))
+
+        # Fallback if file missing
+        fallback = Image.new("L", (max_width, max_height), 255)
+        draw = ImageDraw.Draw(fallback)
+        text = "DEP" if flight_type == "DEP" else "ARR"
+        draw.text((max_width // 2, max_height // 2), text, fill=0, font=self._font_badge, anchor="mm")
+        return fallback
 
     def render(self, data: FlightBoardData, rotate_override: Optional[int] = None) -> bytes:
-        """Render high-contrast e-ink flight board (Doubled Fonts, Plane Icons, Big Time)."""
+        """Render high-contrast e-ink flight board using assets/plane PNG icons."""
         self._init_fonts()
 
         w, h = self.width, self.height
@@ -179,8 +185,8 @@ class BoardRenderer:
         flights = data.flights[:4]  # Exactly 4 flights
 
         # Proportional dimensions based on width and row height
-        icon_w = int(w * 0.080)
-        icon_h = int(row_height * 0.52)
+        icon_w = int(w * 0.085)
+        icon_h = int(row_height * 0.65)
 
         logo_w = int(w * 0.17)
         logo_h = int(row_height * 0.65)
@@ -200,9 +206,10 @@ class BoardRenderer:
             # Outer Row Container Box
             draw.rounded_rectangle([int(w * 0.008), row_y1, w - int(w * 0.008), row_y2], radius=10, fill=bg_color, outline=0, width=2)
 
-            # Col A: Universal Plane Icon (Taking off / Landing, no box, no text label)
+            # Col A: Plane Icon (departure.png or landing.png from assets/plane/)
+            plane_icon = self._load_plane_icon(flight.flight_type, icon_w, icon_h)
             icon_y = row_y1 + (row_height - 6 - icon_h) // 2
-            self._draw_plane_icon(draw, col_icon_x, icon_y, icon_w, icon_h, flight.flight_type)
+            img.paste(plane_icon, (col_icon_x, icon_y))
 
             # Col B: Airline Logo (Bigger!)
             logo_img = self._load_airline_logo(flight.airline_icao, flight.flight_number, logo_w, logo_h)
