@@ -141,9 +141,10 @@ kindle-flight-board/
 ## 🧪 API Endpoints
 
 - `GET /changed?hash=<HASH>`: Returns `{ "changed": true|false, "data_hash": "..." }`
-- `GET /board.png`: Returns high-contrast 1448x1072 PNG image
+- `GET /board.png`: Returns high-contrast PNG image (`?force_refresh=true` or `?rotate=90`)
+- `GET/POST /refresh`: Bypasses cache and forces immediate re-fetch from FlightRadar24 API
 - `GET /api/flights`: Returns raw JSON flight data
-- `GET /status`: Returns last OpenSky API call, HTTP response/payload, and app settings
+- `GET /status`: Returns last FlightRadar24 API call, HTTP response/payload, and app settings
 - `GET /health`: Container health check
 
 ---

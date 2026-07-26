@@ -84,6 +84,26 @@ def get_board_image(
     return Response(content=image_bytes, media_type="image/png", headers=headers)
 
 
+@app.api_route("/refresh", methods=["GET", "POST"])
+def force_refresh_board(
+    rotate: Optional[int] = Query(None, description="Optional override image rotation (0, 90, 180, 270)")
+):
+    """
+    Force refresh flight board data from FlightRadar24 API, bypassing cache.
+    Returns status, updated timestamp, data hash, and flight board details.
+    """
+    logger.info("Force refresh requested. Invalidating cache and querying FlightRadar24...")
+    board_data = flight_service.get_flight_board(force_refresh=True)
+    return {
+        "status": "success",
+        "message": "Flight board data successfully refreshed from FlightRadar24 API",
+        "data_hash": board_data.data_hash,
+        "last_updated": board_data.last_updated,
+        "flight_count": len(board_data.flights),
+        "board_data": board_data
+    }
+
+
 @app.get("/api/flights", response_model=FlightBoardData)
 def get_flights_json():
     """Returns raw structured flight data in JSON format."""
