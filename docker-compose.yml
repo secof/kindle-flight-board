@@ -1,0 +1,29 @@
+version: "3.8"
+
+services:
+  kindle-flight-board:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: kindle-flight-board
+    ports:
+      - "8000:8000"
+    environment:
+      - AIRPORT_ICAO=KJFK
+      - AIRPORT_NAME=John F. Kennedy Intl
+      - TIMEZONE=America/New_York
+      - BOARD_WIDTH=1448
+      - BOARD_HEIGHT=1072
+      - ROTATE_DEGREES=0
+      - INVERT_COLORS=false
+      - OPENSKY_USERNAME=
+      - OPENSKY_PASSWORD=
+      - CACHE_TTL_SECONDS=300
+    volumes:
+      - ./assets:/app/assets
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

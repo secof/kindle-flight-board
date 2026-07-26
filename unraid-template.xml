@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>kindle-flight-board</Name>
+  <Repository>ghcr.io/serbanconstantin/kindle-flight-board:latest</Repository>
+  <Registry>https://ghcr.io/</Registry>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/serbanconstantin/kindle-flight-board/issues</Support>
+  <Project>https://github.com/serbanconstantin/kindle-flight-board</Project>
+  <Overview>
+    Kindle Flight Board backend renderer. Repurposes a jailbroken Kindle e-reader to display live departures and arrivals for any airport using the OpenSky Network API. High-contrast landscape e-ink optimization with conditional polling to preserve Kindle battery life.
+  </Overview>
+  <Category>Status:Beta Tools: Display: Other:</Category>
+  <WebUI>http://[IP]:[PORT:8000]/board.png</WebUI>
+  <TemplateURL/>
+  <Icon>https://raw.githubusercontent.com/walkxcode/dashboard-icons/main/png/plane.png</Icon>
+  <ExtraParams/>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled/>
+  <DonateText/>
+  <DonateLink/>
+  <Requires/>
+  <Config Name="Host Port 8000" Target="8000" Default="8000" Mode="tcp" Description="Backend API Port" Type="Port" Display="always" Required="true" Mask="false">8000</Config>
+  <Config Name="AIRPORT_ICAO" Target="AIRPORT_ICAO" Default="KJFK" Description="Target Airport ICAO Code (e.g. KLAX, EGLL, KJFK)" Type="Variable" Display="always" Required="true" Mask="false">KJFK</Config>
+  <Config Name="AIRPORT_NAME" Target="AIRPORT_NAME" Default="John F. Kennedy Intl" Description="Display Name for Airport Header" Type="Variable" Display="always" Required="false" Mask="false">John F. Kennedy Intl</Config>
+  <Config Name="TIMEZONE" Target="TIMEZONE" Default="America/New_York" Description="Local Timezone Name" Type="Variable" Display="always" Required="true" Mask="false">America/New_York</Config>
+  <Config Name="BOARD_WIDTH" Target="BOARD_WIDTH" Default="1448" Description="Kindle Image Width in Pixels" Type="Variable" Display="advanced" Required="false" Mask="false">1448</Config>
+  <Config Name="BOARD_HEIGHT" Target="BOARD_HEIGHT" Default="1072" Description="Kindle Image Height in Pixels" Type="Variable" Display="advanced" Required="false" Mask="false">1072</Config>
+  <Config Name="ROTATE_DEGREES" Target="ROTATE_DEGREES" Default="0" Description="Rotate Image: 0, 90, 180, 270" Type="Variable" Display="advanced" Required="false" Mask="false">0</Config>
+  <Config Name="OPENSKY_USERNAME" Target="OPENSKY_USERNAME" Default="" Description="Optional OpenSky Network Username" Type="Variable" Display="always" Required="false" Mask="true"></Config>
+  <Config Name="OPENSKY_PASSWORD" Target="OPENSKY_PASSWORD" Default="" Description="Optional OpenSky Network Password" Type="Variable" Display="always" Required="false" Mask="true"></Config>
+  <Config Name="Assets Storage" Target="/app/assets" Default="/mnt/user/appdata/kindle-flight-board/assets" Description="Volume mount for custom logos and fonts" Type="Path" Display="always" Required="false" Mask="false">/mnt/user/appdata/kindle-flight-board/assets</Config>
+</Container>

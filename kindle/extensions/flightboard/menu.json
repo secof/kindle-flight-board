@@ -1,0 +1,22 @@
+{
+	"items": [
+		{
+			"name": "Start Flight Board Daemon",
+			"priority": 1,
+			"action": "bin/launch.sh",
+			"params": "start"
+		},
+		{
+			"name": "Stop Flight Board Daemon",
+			"priority": 2,
+			"action": "bin/launch.sh",
+			"params": "stop"
+		},
+		{
+			"name": "Update Board Once",
+			"priority": 3,
+			"action": "bin/update_board.sh",
+			"params": "once"
+		}
+	]
+}
