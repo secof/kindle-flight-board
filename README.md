@@ -138,6 +138,7 @@ kindle-flight-board/
 - `GET /changed?hash=<HASH>`: Returns `{ "changed": true|false, "data_hash": "..." }`
 - `GET /board.png`: Returns high-contrast 1448x1072 PNG image
 - `GET /api/flights`: Returns raw JSON flight data
+- `GET /status`: Returns last OpenSky API call, HTTP response/payload, and app settings
 - `GET /health`: Container health check
 
 ---

@@ -13,6 +13,14 @@ if ! command -v python3 &> /dev/null; then
     exit 1
 fi
 
+# Ensure .env exists (copy from .env.example if missing)
+if [ ! -f ".env" ]; then
+    if [ -f ".env.example" ]; then
+        echo "📝 Creating .env from .env.example ..."
+        cp .env.example .env
+    fi
+fi
+
 # Create virtual environment if it does not exist
 if [ ! -d "$VENV_DIR" ]; then
     echo "📦 Creating virtual environment in $VENV_DIR ..."
@@ -32,6 +40,7 @@ pip install -r backend/requirements.txt
 echo "🚀 Starting backend development server at http://localhost:8000 ..."
 echo "   Endpoints available:"
 echo "   - Health Check: http://localhost:8000/health"
+echo "   - Status & OpenSky Debug: http://localhost:8000/status"
 echo "   - Kindle Board Image: http://localhost:8000/board.png"
 echo "   - Flight JSON API: http://localhost:8000/api/flights"
 echo ""

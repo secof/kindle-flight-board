@@ -1,8 +1,9 @@
 import time
 import hashlib
 import logging
-from typing import List, Tuple, Dict, Optional
+from typing import List, Tuple, Dict, Optional, Any
 from datetime import datetime, timezone
+from pathlib import Path
 import requests
 from dateutil import tz
 
@@ -33,6 +34,8 @@ AIRLINE_MAP: Dict[str, Tuple[str, str]] = {
     "TAP": ("TAP Air Portugal", "TP"),
     "RYR": ("Ryanair", "FR"),
     "EZY": ("EasyJet", "U2"),
+    "ROT": ("TAROM", "RO"),
+    "WZZ": ("Wizz Air", "W6"),
 }
 
 # Aircraft type fallback map based on random hash or icao24 prefix
@@ -42,11 +45,16 @@ AIRCRAFT_TYPES = ["A320", "B738", "A321", "B789", "A359", "B77W", "A333", "B763"
 class OpenSkyClient:
     def __init__(self):
         self.session = requests.Session()
-        if settings.OPENSKY_USERNAME and settings.OPENSKY_PASSWORD:
-            self.session.auth = (settings.OPENSKY_USERNAME, settings.OPENSKY_PASSWORD)
-        
         self._cache_data: Optional[FlightBoardData] = None
         self._cache_timestamp: float = 0.0
+        self.last_api_call: Optional[Dict[str, Any]] = None
+
+    def _update_auth(self):
+        """Dynamically update HTTP session auth if credentials are set in settings."""
+        if settings.OPENSKY_USERNAME and settings.OPENSKY_PASSWORD:
+            self.session.auth = (settings.OPENSKY_USERNAME, settings.OPENSKY_PASSWORD)
+        else:
+            self.session.auth = None
 
     def _get_airline_info(self, callsign: str) -> Tuple[str, str, str]:
         """Extract ICAO prefix, human name, and formatted flight number from callsign."""
@@ -121,29 +129,53 @@ class OpenSkyClient:
         if not force_refresh and self._cache_data and (now - self._cache_timestamp < settings.CACHE_TTL_SECONDS):
             return self._cache_data
 
+        self._update_auth()
         flights_list: List[Flight] = []
+        target_tz = tz.gettz(settings.TIMEZONE) or tz.tzutc()
         
+        url = "https://opensky-network.org/api/flights/departure"
+        begin_ts = now - 3600 * 2
+        end_ts = now + 3600 * 4
+        
+        params = {
+            "airport": settings.AIRPORT_ICAO,
+            "begin": begin_ts,
+            "end": end_ts
+        }
+        
+        call_time_str = datetime.now(target_tz).strftime("%Y-%m-%d %H:%M:%S %Z")
+
         try:
-            # Query OpenSky departures endpoint
-            url = "https://opensky-network.org/api/flights/departure"
-            params = {
-                "airport": settings.AIRPORT_ICAO,
-                "begin": now - 3600 * 2,  # 2 hours past
-                "end": now + 3600 * 4      # 4 hours future
-            }
             resp = self.session.get(url, params=params, timeout=8)
             
             if resp.status_code == 200:
                 raw_flights = resp.json()
-                parsed_flights: List[Flight] = []
                 
-                for item in raw_flights:
+                self.last_api_call = {
+                    "requested_at": call_time_str,
+                    "url": url,
+                    "params": {
+                        "airport": settings.AIRPORT_ICAO,
+                        "begin": begin_ts,
+                        "begin_formatted": self._format_local_time(begin_ts),
+                        "end": end_ts,
+                        "end_formatted": self._format_local_time(end_ts)
+                    },
+                    "authenticated": bool(settings.OPENSKY_USERNAME and settings.OPENSKY_PASSWORD),
+                    "auth_username": settings.OPENSKY_USERNAME or None,
+                    "status_code": resp.status_code,
+                    "item_count": len(raw_flights) if isinstance(raw_flights, list) else 0,
+                    "response_data": raw_flights,
+                    "error": None
+                }
+                
+                parsed_flights: List[Flight] = []
+                for item in (raw_flights if isinstance(raw_flights, list) else []):
                     callsign = (item.get("callsign") or "").strip()
                     if not callsign:
                         continue
                     
                     est_dep = item.get("firstSeen") or item.get("lastSeen") or now
-                    est_arr = item.get("estDepartureAirport")
                     est_dest = item.get("estArrivalAirport") or "DEST"
                     icao24 = item.get("icao24")
                     
@@ -172,39 +204,62 @@ class OpenSkyClient:
                     )
                 
                 if parsed_flights:
-                    # Select 1 PAST flight (highest timestamp < now)
                     past_flights = sorted([f for f in parsed_flights if f.timestamp <= now], key=lambda x: x.timestamp, reverse=True)
-                    # Select 3 FUTURE flights (lowest timestamp > now)
                     future_flights = sorted([f for f in parsed_flights if f.timestamp > now], key=lambda x: x.timestamp)
                     
                     selected: List[Flight] = []
                     if past_flights:
                         selected.append(past_flights[0])
                     
-                    # Fill future flights up to total 4
                     needed_future = 4 - len(selected)
                     selected.extend(future_flights[:needed_future])
                     
-                    # If we still lack 4 total flights, fill with remaining past flights or mocks
                     if len(selected) < 4:
                         remaining_past = [p for p in past_flights if p not in selected]
                         selected.extend(remaining_past[:4 - len(selected)])
                     
                     flights_list = sorted(selected, key=lambda x: x.timestamp)
-
             else:
-                logger.warning("OpenSky API returned status %d: %s", resp.status_code, resp.text[:100])
+                logger.warning("OpenSky API returned status %d: %s", resp.status_code, resp.text[:200])
+                self.last_api_call = {
+                    "requested_at": call_time_str,
+                    "url": url,
+                    "params": {
+                        "airport": settings.AIRPORT_ICAO,
+                        "begin": begin_ts,
+                        "end": end_ts
+                    },
+                    "authenticated": bool(settings.OPENSKY_USERNAME and settings.OPENSKY_PASSWORD),
+                    "auth_username": settings.OPENSKY_USERNAME or None,
+                    "status_code": resp.status_code,
+                    "item_count": 0,
+                    "response_data": resp.text,
+                    "error": f"HTTP {resp.status_code}: {resp.text[:200]}"
+                }
         except Exception as e:
             logger.error("Failed to query OpenSky API: %s", str(e))
+            self.last_api_call = {
+                "requested_at": call_time_str,
+                "url": url,
+                "params": {
+                    "airport": settings.AIRPORT_ICAO,
+                    "begin": begin_ts,
+                    "end": end_ts
+                },
+                "authenticated": bool(settings.OPENSKY_USERNAME and settings.OPENSKY_PASSWORD),
+                "auth_username": settings.OPENSKY_USERNAME or None,
+                "status_code": None,
+                "item_count": 0,
+                "response_data": None,
+                "error": str(e)
+            }
 
         # Fallback to mock data if OpenSky returned insufficient flights
         if len(flights_list) < 4 and settings.USE_MOCK_DATA_ON_FAILURE:
             flights_list = self._generate_mock_flights(now)
 
         # Build data hash
-        target_tz = tz.gettz(settings.TIMEZONE) or tz.tzutc()
         last_updated_str = datetime.now(target_tz).strftime("%Y-%m-%d %H:%M:%S")
-        
         raw_hash_str = f"{settings.AIRPORT_ICAO}-" + "-".join([f"{f.callsign}:{f.timestamp}:{f.status}" for f in flights_list])
         data_hash = hashlib.sha256(raw_hash_str.encode()).hexdigest()[:16]
 
@@ -219,6 +274,27 @@ class OpenSkyClient:
         self._cache_data = board_data
         self._cache_timestamp = now
         return board_data
+
+    def get_status(self) -> Dict[str, Any]:
+        """Return system status including active app settings and the last OpenSky API call."""
+        target_tz = tz.gettz(settings.TIMEZONE) or tz.tzutc()
+        current_time_str = datetime.now(target_tz).strftime("%Y-%m-%d %H:%M:%S %Z")
+        
+        app_settings = {}
+        for key, value in settings.model_dump().items():
+            if key == "OPENSKY_PASSWORD" and value:
+                app_settings[key] = "********"
+            elif isinstance(value, Path):
+                app_settings[key] = str(value)
+            else:
+                app_settings[key] = value
+
+        return {
+            "status": "online",
+            "current_time": current_time_str,
+            "last_opensky_call": self.last_api_call or "No call made yet (endpoint has not been queried)",
+            "app_settings": app_settings
+        }
 
 
 opensky_client = OpenSkyClient()

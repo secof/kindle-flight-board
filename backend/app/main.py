@@ -33,6 +33,15 @@ def health_check():
     }
 
 
+@app.get("/status")
+def get_status():
+    """
+    Returns system status including the last call to OpenSky API,
+    the response received, and all active app settings.
+    """
+    return opensky_client.get_status()
+
+
 @app.get("/changed", response_model=ChangedStatus)
 def check_changed(
     client_hash: Optional[str] = Query(None, alias="hash", description="SHA256 hash currently held by Kindle"),
