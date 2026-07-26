@@ -71,7 +71,7 @@ kindle-flight-board/
 
 1. Clone repository to your server:
    ```bash
-   git clone https://github.com/serbanconstantin/kindle-flight-board.git
+   git clone https://github.com/secof/kindle-flight-board.git
    cd kindle-flight-board
    ```
 2. Edit `docker-compose.yml` to set your target `AIRPORT_ICAO` (e.g. `KJFK`, `EGLL`, `KLAX`), timezone, and dimensions:

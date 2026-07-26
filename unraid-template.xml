@@ -1,14 +1,14 @@
 <?xml version="1.0"?>
 <Container version="2">
   <Name>kindle-flight-board</Name>
-  <Repository>ghcr.io/serbanconstantin/kindle-flight-board:latest</Repository>
+  <Repository>ghcr.io/secof/kindle-flight-board:latest</Repository>
   <Registry>https://ghcr.io/</Registry>
   <Network>bridge</Network>
   <MyIP/>
   <Shell>sh</Shell>
   <Privileged>false</Privileged>
-  <Support>https://github.com/serbanconstantin/kindle-flight-board/issues</Support>
-  <Project>https://github.com/serbanconstantin/kindle-flight-board</Project>
+  <Support>https://github.com/secof/kindle-flight-board/issues</Support>
+  <Project>https://github.com/secof/kindle-flight-board</Project>
   <Overview>
     Kindle Flight Board backend renderer. Repurposes a jailbroken Kindle e-reader to display live departures and arrivals for any airport using the OpenSky Network API. High-contrast landscape e-ink optimization with conditional polling to preserve Kindle battery life.
   </Overview>
