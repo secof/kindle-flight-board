@@ -16,8 +16,6 @@ services:
       - BOARD_HEIGHT=1072
       - ROTATE_DEGREES=0
       - INVERT_COLORS=false
-      - OPENSKY_USERNAME=
-      - OPENSKY_PASSWORD=
       - CACHE_TTL_SECONDS=300
     volumes:
       - ./assets:/app/assets

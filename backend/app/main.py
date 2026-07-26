@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse, Response
 from typing import Optional
 
 from app.config import settings
-from app.opensky import opensky_client
+from app.flight_service import flight_service
 from app.renderer import renderer
 from app.models import ChangedStatus, FlightBoardData
 
@@ -36,10 +36,10 @@ def health_check():
 @app.get("/status")
 def get_status():
     """
-    Returns system status including the last call to OpenSky API,
+    Returns system status including the last call to FlightRadar24 API,
     the response received, and all active app settings.
     """
-    return opensky_client.get_status()
+    return flight_service.get_status()
 
 
 @app.get("/changed", response_model=ChangedStatus)
@@ -51,7 +51,7 @@ def check_changed(
     Lightweight endpoint for Kindle daemon to check if board data has changed.
     Avoids unnecessary image downloads to conserve Kindle battery & e-ink cycles.
     """
-    board_data = opensky_client.get_flight_board()
+    board_data = flight_service.get_flight_board()
     target_hash = client_hash or (if_none_match.strip('"') if if_none_match else None)
     
     has_changed = (target_hash != board_data.data_hash)
@@ -65,12 +65,12 @@ def check_changed(
 
 @app.get("/board.png")
 def get_board_image(
-    force_refresh: bool = Query(False, description="Bypass cache and force re-fetch from OpenSky")
+    force_refresh: bool = Query(False, description="Bypass cache and force re-fetch from FlightRadar24")
 ):
     """
     Render and serve high-contrast 1448x1072 landscape PNG image for Kindle display.
     """
-    board_data = opensky_client.get_flight_board(force_refresh=force_refresh)
+    board_data = flight_service.get_flight_board(force_refresh=force_refresh)
     image_bytes = renderer.render(board_data)
     
     headers = {
@@ -86,4 +86,4 @@ def get_board_image(
 @app.get("/api/flights", response_model=FlightBoardData)
 def get_flights_json():
     """Returns raw structured flight data in JSON format."""
-    return opensky_client.get_flight_board()
+    return flight_service.get_flight_board()

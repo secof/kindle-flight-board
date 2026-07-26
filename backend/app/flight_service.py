@@ -10,7 +10,7 @@ from FlightRadarAPI import FlightRadar24API
 from app.config import settings
 from app.models import Flight, FlightBoardData
 
-logger = logging.getLogger("kindle-flight-board.flightradar")
+logger = logging.getLogger("kindle-flight-board.flightservice")
 
 # Mapping common ICAO airline prefixes to names & IATA prefixes
 AIRLINE_MAP: Dict[str, Tuple[str, str]] = {
@@ -42,8 +42,8 @@ AIRLINE_MAP: Dict[str, Tuple[str, str]] = {
 AIRCRAFT_TYPES = ["A320", "B738", "A321", "B789", "A359", "B77W", "A333", "B763", "E190", "A20N"]
 
 
-class OpenSkyClient:
-    """Client for fetching live airport schedules via FlightRadar24."""
+class FlightService:
+    """Service for fetching live airport schedules via FlightRadar24."""
     def __init__(self):
         self.fr_api = FlightRadar24API()
         self._cache_data: Optional[FlightBoardData] = None
@@ -116,6 +116,7 @@ class OpenSkyClient:
                     destination=dest,
                     aircraft_type=ac_type,
                     timestamp=ts,
+                    scheduled_ts=ts,
                     scheduled_time=time_str,
                     estimated_time=time_str,
                     formatted_time=time_str,
@@ -128,7 +129,7 @@ class OpenSkyClient:
     def get_flight_board(self, force_refresh: bool = False) -> FlightBoardData:
         """
         Fetch departures and arrivals from FlightRadar24, filter to ONLY 4 upcoming flights
-        from the API call timestamp forward, and format.
+        from the API call timestamp forward, and sort strictly by scheduled time.
         """
         now = int(time.time())
         target_tz = tz.gettz(settings.TIMEZONE) or tz.tzutc()
@@ -175,10 +176,11 @@ class OpenSkyClient:
                     continue
                 
                 effective_ts = est_ts or sched_ts
+                sort_ts = sched_ts or effective_ts
                 status_raw = flt.get("status", {}).get("text") or "SCHEDULED"
                 
                 # Exclude past flights or already departed/canceled flights
-                if effective_ts < (now - 300) or ("Departed" in status_raw) or ("Canceled" in status_raw):
+                if sort_ts < (now - 300) or ("Departed" in status_raw) or ("Canceled" in status_raw):
                     continue
                 
                 ident = flt.get("identification", {})
@@ -201,7 +203,7 @@ class OpenSkyClient:
                 est_str = self._format_local_time(est_ts) if est_ts else None
                 
                 upcoming_candidates.append((
-                    effective_ts,
+                    sort_ts,
                     Flight(
                         icao24=ident.get("row") and str(ident.get("row")),
                         callsign=callsign,
@@ -213,9 +215,10 @@ class OpenSkyClient:
                         destination=dest_code,
                         aircraft_type=ac_type,
                         timestamp=effective_ts,
+                        scheduled_ts=sort_ts,
                         scheduled_time=sched_str,
                         estimated_time=est_str,
-                        formatted_time=est_str or sched_str,
+                        formatted_time=sched_str,
                         status=status_raw,
                         is_past=False
                     )
@@ -234,10 +237,11 @@ class OpenSkyClient:
                     continue
                 
                 effective_ts = est_ts or sched_ts
+                sort_ts = sched_ts or effective_ts
                 status_raw = flt.get("status", {}).get("text") or "SCHEDULED"
                 
                 # Exclude past flights or already landed/canceled flights
-                if effective_ts < (now - 300) or ("Landed" in status_raw) or ("Canceled" in status_raw):
+                if sort_ts < (now - 300) or ("Landed" in status_raw) or ("Canceled" in status_raw):
                     continue
                 
                 ident = flt.get("identification", {})
@@ -260,7 +264,7 @@ class OpenSkyClient:
                 est_str = self._format_local_time(est_ts) if est_ts else None
                 
                 upcoming_candidates.append((
-                    effective_ts,
+                    sort_ts,
                     Flight(
                         icao24=ident.get("row") and str(ident.get("row")),
                         callsign=callsign,
@@ -272,15 +276,16 @@ class OpenSkyClient:
                         destination=dest_code,
                         aircraft_type=ac_type,
                         timestamp=effective_ts,
+                        scheduled_ts=sort_ts,
                         scheduled_time=sched_str,
                         estimated_time=est_str,
-                        formatted_time=est_str or sched_str,
+                        formatted_time=sched_str,
                         status=status_raw,
                         is_past=False
                     )
                 ))
 
-            # Sort chronologically by effective timestamp and pick ONLY the next 4 flights
+            # Sort strictly by scheduled_ts ascending and pick ONLY the next 4 flights
             upcoming_candidates.sort(key=lambda x: x[0])
             flights_list = [f[1] for f in upcoming_candidates[:4]]
                 
@@ -302,7 +307,7 @@ class OpenSkyClient:
 
         # Build data hash
         last_updated_str = datetime.now(target_tz).strftime("%Y-%m-%d %H:%M:%S")
-        raw_hash_str = f"{settings.AIRPORT_ICAO}-" + "-".join([f"{f.flight_type}:{f.callsign}:{f.timestamp}:{f.status}" for f in flights_list])
+        raw_hash_str = f"{settings.AIRPORT_ICAO}-" + "-".join([f"{f.flight_type}:{f.callsign}:{f.scheduled_ts}:{f.status}" for f in flights_list])
         data_hash = hashlib.sha256(raw_hash_str.encode()).hexdigest()[:16]
 
         board_data = FlightBoardData(
@@ -324,9 +329,7 @@ class OpenSkyClient:
         
         app_settings = {}
         for key, value in settings.model_dump().items():
-            if key == "OPENSKY_PASSWORD" and value:
-                app_settings[key] = "********"
-            elif isinstance(value, Path):
+            if isinstance(value, Path):
                 app_settings[key] = str(value)
             else:
                 app_settings[key] = value
@@ -340,4 +343,4 @@ class OpenSkyClient:
         }
 
 
-opensky_client = OpenSkyClient()
+flight_service = FlightService()

@@ -13,6 +13,7 @@ class Flight(BaseModel):
     destination: str = Field(..., description="Destination airport code or city")
     aircraft_type: str = Field(default="A320", description="Aircraft model code (e.g. B738, A321, A21N)")
     timestamp: int = Field(..., description="Effective departure/arrival epoch timestamp")
+    scheduled_ts: int = Field(..., description="Scheduled departure/arrival epoch timestamp for sorting")
     scheduled_time: str = Field(..., description="Scheduled local time HH:MM")
     estimated_time: Optional[str] = Field(default=None, description="Estimated/real local time HH:MM if available")
     formatted_time: str = Field(..., description="Formatted local display time HH:MM")

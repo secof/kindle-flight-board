@@ -30,7 +30,5 @@
   <Config Name="BOARD_WIDTH" Target="BOARD_WIDTH" Default="1448" Description="Kindle Image Width in Pixels" Type="Variable" Display="advanced" Required="false" Mask="false">1448</Config>
   <Config Name="BOARD_HEIGHT" Target="BOARD_HEIGHT" Default="1072" Description="Kindle Image Height in Pixels" Type="Variable" Display="advanced" Required="false" Mask="false">1072</Config>
   <Config Name="ROTATE_DEGREES" Target="ROTATE_DEGREES" Default="0" Description="Rotate Image: 0, 90, 180, 270" Type="Variable" Display="advanced" Required="false" Mask="false">0</Config>
-  <Config Name="OPENSKY_USERNAME" Target="OPENSKY_USERNAME" Default="" Description="Optional OpenSky Network Username" Type="Variable" Display="always" Required="false" Mask="true"></Config>
-  <Config Name="OPENSKY_PASSWORD" Target="OPENSKY_PASSWORD" Default="" Description="Optional OpenSky Network Password" Type="Variable" Display="always" Required="false" Mask="true"></Config>
   <Config Name="Assets Storage" Target="/app/assets" Default="/mnt/user/appdata/kindle-flight-board/assets" Description="Volume mount for custom logos and fonts" Type="Path" Display="always" Required="false" Mask="false">/mnt/user/appdata/kindle-flight-board/assets</Config>
 </Container>
