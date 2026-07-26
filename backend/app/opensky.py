@@ -69,14 +69,19 @@ class OpenSkyClient:
 
     def _get_aircraft_type(self, raw_aircraft: dict, callsign: str) -> str:
         """Extract or infer aircraft model code."""
-        code = raw_aircraft.get("model", {}).get("code") if raw_aircraft else None
-        if code:
-            return code
+        if raw_aircraft and isinstance(raw_aircraft, dict):
+            model = raw_aircraft.get("model", {})
+            if isinstance(model, dict):
+                code = model.get("code") or model.get("text")
+                if code:
+                    return code
         idx = int(hashlib.md5(callsign.encode()).hexdigest(), 16) % len(AIRCRAFT_TYPES)
         return AIRCRAFT_TYPES[idx]
 
-    def _format_local_time(self, epoch_sec: int) -> str:
+    def _format_local_time(self, epoch_sec: Optional[int]) -> str:
         """Format epoch timestamp to target timezone HH:MM."""
+        if not epoch_sec:
+            return "--:--"
         try:
             target_tz = tz.gettz(settings.TIMEZONE) or tz.tzutc()
             dt = datetime.fromtimestamp(epoch_sec, tz=timezone.utc).astimezone(target_tz)
@@ -85,24 +90,20 @@ class OpenSkyClient:
             return datetime.fromtimestamp(epoch_sec).strftime("%H:%M")
 
     def _generate_mock_flights(self, now: int) -> List[Flight]:
-        """Generate realistic mock data if API is down or rate limited."""
-        logger.warning("Generating mock flight dataset for airport %s", settings.AIRPORT_ICAO)
+        """Generate 4 mock upcoming flights starting from current time forward."""
+        logger.warning("Generating 4 mock upcoming flights for airport %s", settings.AIRPORT_ICAO)
         
         mock_raw = [
-            ("AAL100", settings.AIRPORT_ICAO, "EGLL", now - 1200, "DEPARTED"),
-            ("DLH400", settings.AIRPORT_ICAO, "EDDF", now + 900, "BOARDING"),
-            ("BAW178", settings.AIRPORT_ICAO, "EGLL", now + 2400, "SCHEDULED"),
-            ("AFR007", settings.AIRPORT_ICAO, "LFPG", now + 4200, "SCHEDULED"),
+            ("DEP", "RYR9536", settings.AIRPORT_ICAO, "BRI", "B738", now + 600, "Estimated dep 23:50"),
+            ("ARR", "WZZ5975", "BUD", settings.AIRPORT_ICAO, "A21N", now + 1800, "Estimated arr 00:10"),
+            ("DEP", "WMT924", settings.AIRPORT_ICAO, "BGY", "A321", now + 3600, "Scheduled 01:00"),
+            ("ARR", "ROT101", "OTP", settings.AIRPORT_ICAO, "E190", now + 5400, "Scheduled 01:30"),
         ]
         
         flights = []
-        for callsign, orig, dest, ts, status_str in mock_raw:
+        for flt_type, callsign, orig, dest, ac_type, ts, status_str in mock_raw:
             icao_prefix, airline_name, flt_num = self._get_airline_info({}, callsign)
-            ac_type = self._get_aircraft_type({}, callsign)
-            is_past = ts < now
             time_str = self._format_local_time(ts)
-            
-            status = f"{status_str} {time_str}" if is_past or status_str == "BOARDING" else f"SCHED {time_str}"
             
             flights.append(
                 Flight(
@@ -110,19 +111,25 @@ class OpenSkyClient:
                     airline_icao=icao_prefix,
                     airline_name=airline_name,
                     flight_number=flt_num,
+                    flight_type=flt_type,
                     origin=orig,
                     destination=dest,
                     aircraft_type=ac_type,
                     timestamp=ts,
+                    scheduled_time=time_str,
+                    estimated_time=time_str,
                     formatted_time=time_str,
-                    status=status,
-                    is_past=is_past
+                    status=status_str,
+                    is_past=False
                 )
             )
         return flights
 
     def get_flight_board(self, force_refresh: bool = False) -> FlightBoardData:
-        """Fetch live departure/arrival flights via FlightRadar24, filter to 1 past + 3 future, and format."""
+        """
+        Fetch departures and arrivals from FlightRadar24, filter to ONLY 4 upcoming flights
+        from the API call timestamp forward, and format.
+        """
         now = int(time.time())
         target_tz = tz.gettz(settings.TIMEZONE) or tz.tzutc()
         
@@ -153,14 +160,25 @@ class OpenSkyClient:
                 "error": None if details else f"Airport details not found for {settings.AIRPORT_ICAO}"
             }
             
-            parsed_flights: List[Flight] = []
+            upcoming_candidates: List[Tuple[int, Flight]] = []
             
-            # Combine departures and arrivals if needed (prioritizing departures)
-            items_to_process = raw_deps if raw_deps else raw_arrs
-            
-            for item in items_to_process:
+            # Process Departures
+            for item in raw_deps:
                 flt = item.get("flight", {})
                 if not flt:
+                    continue
+                
+                times = flt.get("time", {})
+                sched_ts = times.get("scheduled", {}).get("departure")
+                est_ts = times.get("estimated", {}).get("departure") or times.get("real", {}).get("departure") or sched_ts
+                if not sched_ts and not est_ts:
+                    continue
+                
+                effective_ts = est_ts or sched_ts
+                status_raw = flt.get("status", {}).get("text") or "SCHEDULED"
+                
+                # Exclude past flights or already departed/canceled flights
+                if effective_ts < (now - 300) or ("Departed" in status_raw) or ("Canceled" in status_raw):
                     continue
                 
                 ident = flt.get("identification", {})
@@ -179,49 +197,92 @@ class OpenSkyClient:
                 
                 orig_code = flt.get("airport", {}).get("origin", {}).get("code", {}).get("iata") or settings.AIRPORT_ICAO
                 
-                times = flt.get("time", {})
-                dep_time = times.get("real", {}).get("departure") or \
-                           times.get("estimated", {}).get("departure") or \
-                           times.get("scheduled", {}).get("departure") or now
+                sched_str = self._format_local_time(sched_ts)
+                est_str = self._format_local_time(est_ts) if est_ts else None
                 
-                time_str = self._format_local_time(dep_time)
-                status_raw = flt.get("status", {}).get("text") or "SCHEDULED"
-                
-                is_past = (dep_time < now) or ("Departed" in status_raw) or ("Landed" in status_raw)
-                
-                parsed_flights.append(
+                upcoming_candidates.append((
+                    effective_ts,
                     Flight(
                         icao24=ident.get("row") and str(ident.get("row")),
                         callsign=callsign,
                         airline_icao=icao_prefix,
                         airline_name=airline_name,
                         flight_number=formatted_flt_num,
+                        flight_type="DEP",
                         origin=orig_code,
                         destination=dest_code,
                         aircraft_type=ac_type,
-                        timestamp=dep_time,
-                        formatted_time=time_str,
+                        timestamp=effective_ts,
+                        scheduled_time=sched_str,
+                        estimated_time=est_str,
+                        formatted_time=est_str or sched_str,
                         status=status_raw,
-                        is_past=is_past
+                        is_past=False
                     )
-                )
-            
-            if parsed_flights:
-                past_flights = sorted([f for f in parsed_flights if f.is_past], key=lambda x: x.timestamp, reverse=True)
-                future_flights = sorted([f for f in parsed_flights if not f.is_past], key=lambda x: x.timestamp)
+                ))
+
+            # Process Arrivals
+            for item in raw_arrs:
+                flt = item.get("flight", {})
+                if not flt:
+                    continue
                 
-                selected: List[Flight] = []
-                if past_flights:
-                    selected.append(past_flights[0])
+                times = flt.get("time", {})
+                sched_ts = times.get("scheduled", {}).get("arrival")
+                est_ts = times.get("estimated", {}).get("arrival") or times.get("real", {}).get("arrival") or sched_ts
+                if not sched_ts and not est_ts:
+                    continue
                 
-                needed_future = 4 - len(selected)
-                selected.extend(future_flights[:needed_future])
+                effective_ts = est_ts or sched_ts
+                status_raw = flt.get("status", {}).get("text") or "SCHEDULED"
                 
-                if len(selected) < 4:
-                    remaining_past = [p for p in past_flights if p not in selected]
-                    selected.extend(remaining_past[:4 - len(selected)])
+                # Exclude past flights or already landed/canceled flights
+                if effective_ts < (now - 300) or ("Landed" in status_raw) or ("Canceled" in status_raw):
+                    continue
                 
-                flights_list = sorted(selected, key=lambda x: x.timestamp)
+                ident = flt.get("identification", {})
+                flt_num = ident.get("number", {}).get("default") or ident.get("callsign") or "N/A"
+                callsign = ident.get("callsign") or flt_num
+                
+                raw_airline = flt.get("airline") or flt.get("owner") or {}
+                icao_prefix, airline_name, formatted_flt_num = self._get_airline_info(raw_airline, callsign)
+                
+                raw_aircraft = flt.get("aircraft") or {}
+                ac_type = self._get_aircraft_type(raw_aircraft, callsign)
+                
+                orig_code = flt.get("airport", {}).get("origin", {}).get("code", {}).get("iata") or \
+                            flt.get("airport", {}).get("origin", {}).get("code", {}).get("icao") or \
+                            flt.get("airport", {}).get("origin", {}).get("position", {}).get("region", {}).get("city") or "ORIG"
+                
+                dest_code = flt.get("airport", {}).get("destination", {}).get("code", {}).get("iata") or settings.AIRPORT_ICAO
+                
+                sched_str = self._format_local_time(sched_ts)
+                est_str = self._format_local_time(est_ts) if est_ts else None
+                
+                upcoming_candidates.append((
+                    effective_ts,
+                    Flight(
+                        icao24=ident.get("row") and str(ident.get("row")),
+                        callsign=callsign,
+                        airline_icao=icao_prefix,
+                        airline_name=airline_name,
+                        flight_number=formatted_flt_num,
+                        flight_type="ARR",
+                        origin=orig_code,
+                        destination=dest_code,
+                        aircraft_type=ac_type,
+                        timestamp=effective_ts,
+                        scheduled_time=sched_str,
+                        estimated_time=est_str,
+                        formatted_time=est_str or sched_str,
+                        status=status_raw,
+                        is_past=False
+                    )
+                ))
+
+            # Sort chronologically by effective timestamp and pick ONLY the next 4 flights
+            upcoming_candidates.sort(key=lambda x: x[0])
+            flights_list = [f[1] for f in upcoming_candidates[:4]]
                 
         except Exception as e:
             logger.error("Failed to query FlightRadar24 API: %s", str(e))
@@ -235,13 +296,13 @@ class OpenSkyClient:
                 "error": str(e)
             }
 
-        # Fallback to mock data if API returned zero flights
+        # Fallback to mock data if API returned zero upcoming flights
         if len(flights_list) < 4 and settings.USE_MOCK_DATA_ON_FAILURE:
             flights_list = self._generate_mock_flights(now)
 
         # Build data hash
         last_updated_str = datetime.now(target_tz).strftime("%Y-%m-%d %H:%M:%S")
-        raw_hash_str = f"{settings.AIRPORT_ICAO}-" + "-".join([f"{f.callsign}:{f.timestamp}:{f.status}" for f in flights_list])
+        raw_hash_str = f"{settings.AIRPORT_ICAO}-" + "-".join([f"{f.flight_type}:{f.callsign}:{f.timestamp}:{f.status}" for f in flights_list])
         data_hash = hashlib.sha256(raw_hash_str.encode()).hexdigest()[:16]
 
         board_data = FlightBoardData(

@@ -1,28 +1,30 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional
-from datetime import datetime
 
 
 class Flight(BaseModel):
-    icao24: Optional[str] = Field(default=None, description="Transponder ICAO 24-bit address")
-    callsign: str = Field(..., description="Flight callsign / number (e.g. AAL100, DLH400)")
-    airline_icao: str = Field(..., description="3-letter ICAO airline code (e.g. AAL, DLH, BAW)")
+    icao24: Optional[str] = Field(default=None, description="Transponder ICAO 24-bit address or row ID")
+    callsign: str = Field(..., description="Flight callsign / number")
+    airline_icao: str = Field(..., description="3-letter ICAO airline code (e.g. RYR, WZZ, ROT)")
     airline_name: str = Field(default="Airline", description="Readable airline name")
-    flight_number: str = Field(..., description="Formatted flight number (e.g. AA 100, LH 400)")
-    origin: str = Field(..., description="Origin airport ICAO or IATA code")
-    destination: str = Field(..., description="Destination airport ICAO or IATA code")
-    aircraft_type: str = Field(default="A320", description="Aircraft type designator (e.g. A320, B738, B789)")
-    timestamp: int = Field(..., description="Flight departure/arrival epoch timestamp")
-    formatted_time: str = Field(..., description="Formatted local time (e.g. 14:25)")
-    status: str = Field(..., description="Flight status (e.g. DEPARTED 14:10, SCHEDULED, BOARDING)")
-    is_past: bool = Field(default=False, description="True if flight departed/arrived in the past")
+    flight_number: str = Field(..., description="Formatted flight number (e.g. FR 9537, W6 3291)")
+    flight_type: str = Field(default="DEP", description="Flight type: DEP (Departure) or ARR (Arrival)")
+    origin: str = Field(..., description="Origin airport code or city")
+    destination: str = Field(..., description="Destination airport code or city")
+    aircraft_type: str = Field(default="A320", description="Aircraft model code (e.g. B738, A321, A21N)")
+    timestamp: int = Field(..., description="Effective departure/arrival epoch timestamp")
+    scheduled_time: str = Field(..., description="Scheduled local time HH:MM")
+    estimated_time: Optional[str] = Field(default=None, description="Estimated/real local time HH:MM if available")
+    formatted_time: str = Field(..., description="Formatted local display time HH:MM")
+    status: str = Field(..., description="Flight status text (e.g. Delayed 23:11, Estimated dep 23:50)")
+    is_past: bool = Field(default=False, description="True if flight completed in the past")
 
 
 class FlightBoardData(BaseModel):
     airport_icao: str
     airport_name: str
     last_updated: str
-    flights: List[Flight]  # Exactly 4 flights: 1 past, 3 future
+    flights: List[Flight]  # Exactly 4 upcoming flights
     data_hash: str
 
 
