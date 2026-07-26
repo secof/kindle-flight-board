@@ -106,9 +106,9 @@ class BoardRenderer:
         meta_str = f"UPDATED: {data.last_updated}"
         draw.text((self.width - 40, 36), meta_str, fill=60, font=self._font_row_small, anchor="rt")
         
-        status_pill_rect = [self.width - 240, 72, self.width - 40, 108]
+        status_pill_rect = [self.width - 270, 72, self.width - 40, 108]
         draw.rounded_rectangle(status_pill_rect, radius=6, fill=0)
-        draw.text((self.width - 140, 90), "LIVE • OPENSKY", fill=255, font=self._font_row_small, anchor="mm")
+        draw.text((self.width - 155, 90), "LIVE • FLIGHTRADAR24", fill=255, font=self._font_row_small, anchor="mm")
 
         # Dividing line
         draw.line([(0, header_height), (self.width, header_height)], fill=0, width=4)
@@ -182,7 +182,7 @@ class BoardRenderer:
         # 3. FOOTER SECTION
         footer_y = self.height - 32
         draw.line([(20, footer_y - 8), (self.width - 20, footer_y - 8)], fill=180, width=1)
-        draw.text((40, footer_y), f"Kindle Paperwhite Display (FW 5.17)  •  OpenSky Network API  •  Timezone: {settings.TIMEZONE}", fill=120, font=self._font_row_small)
+        draw.text((40, footer_y), f"Kindle Paperwhite Display (FW 5.17)  •  Flightradar24 API  •  Timezone: {settings.TIMEZONE}", fill=120, font=self._font_row_small)
         draw.text((self.width - 40, footer_y), f"HASH: {data.data_hash}", fill=120, font=self._font_row_small, anchor="rt")
 
         # Apply rotation if configured
