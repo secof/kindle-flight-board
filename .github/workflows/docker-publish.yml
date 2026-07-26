@@ -3,6 +3,11 @@ name: Build and Push Docker Image
 on:
   push:
     branches: [ "main" ]
+    paths:
+      - 'backend/**'
+      - 'assets/**'
+      - 'docker-compose.yml'
+      - '.github/workflows/docker-publish.yml'
   workflow_dispatch:
 
 env:
