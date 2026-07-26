@@ -18,6 +18,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY backend/app/ ./app/
 COPY assets/ ./assets/
+COPY assets/ ./assets_default/
 
 EXPOSE 8000
 

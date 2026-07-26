@@ -3,6 +3,9 @@ from fastapi import FastAPI, Query, Response, Header
 from fastapi.responses import JSONResponse, Response
 from typing import Optional
 
+import shutil
+from pathlib import Path
+
 from app.config import settings
 from app.flight_service import flight_service
 from app.renderer import renderer
@@ -20,6 +23,30 @@ app = FastAPI(
     description="Backend API serving live flight data images for Kindle e-ink display",
     version="1.0.0"
 )
+
+
+def init_assets_volume():
+    """Populate mounted assets volume with default assets if empty or missing files."""
+    assets_dir = settings.ASSETS_DIR
+    default_assets_dir = Path("/app/assets_default")
+
+    if default_assets_dir.exists():
+        for item in default_assets_dir.glob("**/*"):
+            if item.is_file():
+                rel_path = item.relative_to(default_assets_dir)
+                target_path = assets_dir / rel_path
+                if not target_path.exists():
+                    target_path.parent.mkdir(parents=True, exist_ok=True)
+                    try:
+                        shutil.copy2(item, target_path)
+                        logger.info("Copied missing asset to volume: %s", rel_path)
+                    except Exception as e:
+                        logger.warning("Failed to copy asset %s: %s", rel_path, e)
+
+
+@app.on_event("startup")
+def on_startup():
+    init_assets_volume()
 
 
 @app.get("/health")
