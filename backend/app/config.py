@@ -23,9 +23,9 @@ class Settings(BaseSettings):
     AIRPORT_NAME: str = Field(default="John F. Kennedy Intl", description="Display name for airport header")
     TIMEZONE: str = Field(default="America/New_York", description="Timezone name for display timestamps")
     
-    # Display Settings (Kindle Paperwhite FW 5.17)
-    BOARD_WIDTH: int = Field(default=1448, description="Target image width in pixels")
-    BOARD_HEIGHT: int = Field(default=1072, description="Target image height in pixels")
+    # Display Settings (Kindle Paperwhite 10th Gen)
+    BOARD_WIDTH: int = Field(default=1072, description="Target image width in pixels for Kindle Paperwhite 10")
+    BOARD_HEIGHT: int = Field(default=1448, description="Target image height in pixels for Kindle Paperwhite 10")
     ROTATE_DEGREES: int = Field(default=90, description="Rotation degrees: 0, 90, 180, 270")
     INVERT_COLORS: bool = Field(default=False, description="Invert black/white for dark mode e-ink display")
     
