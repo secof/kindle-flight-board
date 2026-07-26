@@ -3,8 +3,8 @@ version: "3.8"
 services:
   kindle-flight-board:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: kindle-flight-board
     ports:
       - "8000:8000"
