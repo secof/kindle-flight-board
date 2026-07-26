@@ -65,13 +65,14 @@ def check_changed(
 
 @app.get("/board.png")
 def get_board_image(
-    force_refresh: bool = Query(False, description="Bypass cache and force re-fetch from FlightRadar24")
+    force_refresh: bool = Query(False, description="Bypass cache and force re-fetch from FlightRadar24"),
+    rotate: Optional[int] = Query(None, description="Override image rotation (0, 90, 180, 270)")
 ):
     """
-    Render and serve high-contrast 1448x1072 landscape PNG image for Kindle display.
+    Render and serve high-contrast landscape/portrait PNG image for Kindle display.
     """
     board_data = flight_service.get_flight_board(force_refresh=force_refresh)
-    image_bytes = renderer.render(board_data)
+    image_bytes = renderer.render(board_data, rotate_override=rotate)
     
     headers = {
         "Cache-Control": "public, max-age=60",

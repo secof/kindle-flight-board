@@ -103,17 +103,22 @@ kindle-flight-board/
 - **KUAL** (Kindle Unified Application Launcher) installed.
 
 ### Installation Steps:
-1. Connect Kindle to computer via USB.
-2. Edit `kindle/extensions/flightboard/bin/update_board.sh` and update `SERVER_URL` to point to your Unraid/Docker server IP:
+1. Connect your Kindle to your computer via USB.
+2. Copy ONLY the `flightboard` folder from `kindle/extensions/flightboard/` on your computer into the `extensions/` directory on your Kindle USB drive.
+   
+   > [!IMPORTANT]
+   > The path on your Kindle USB drive **MUST** be exactly:
+   > `[Kindle USB Root]/extensions/flightboard/menu.json`
+   > (Do NOT copy as `extensions/kindle/extensions/flightboard` or `extensions/extensions/flightboard`).
+
+3. Set your server IP by creating or editing `config.env` inside `[Kindle USB Drive]/extensions/flightboard/config.env` (or `/mnt/us/flightboard.conf`):
    ```sh
    SERVER_URL="http://192.168.1.100:8000"
+   POLL_INTERVAL=60
+   TOGGLE_WIFI=0
    ```
-3. Copy the `kindle/extensions/flightboard/` directory into your Kindle's `/extensions/` folder:
-   ```
-   [Kindle USB Drive]/extensions/flightboard/
-   ```
-4. Safely eject Kindle.
-5. Open **KUAL** on your Kindle, navigate to **Kindle Flight Board**, and select **Start Flight Board Daemon**.
+4. Safely eject your Kindle USB drive.
+5. Exit KUAL if it was open, then re-open **KUAL** on your Kindle. You will now see **Kindle Flight Board** listed in the menu!
 
 ---
 

@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     # Display Settings (Kindle Paperwhite FW 5.17)
     BOARD_WIDTH: int = Field(default=1448, description="Target image width in pixels")
     BOARD_HEIGHT: int = Field(default=1072, description="Target image height in pixels")
-    ROTATE_DEGREES: int = Field(default=0, description="Rotation degrees: 0, 90, 180, 270")
+    ROTATE_DEGREES: int = Field(default=90, description="Rotation degrees: 0, 90, 180, 270")
     INVERT_COLORS: bool = Field(default=False, description="Invert black/white for dark mode e-ink display")
     
     # Polling & Cache Settings

@@ -28,6 +28,8 @@ case "$action" in
             rm -f "$PID_FILE"
             # Re-enable standard screen saver
             lipc-set-prop com.lab126.powerd preventScreenSaver 0 2>/dev/null
+            # Return to Kindle Home Screen booklet
+            lipc-set-prop com.lab126.appmgrd start app://com.lab126.booklet.home 2>/dev/null
         else
             echo "Daemon is not running."
         fi

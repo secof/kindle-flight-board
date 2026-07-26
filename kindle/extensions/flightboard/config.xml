@@ -1,7 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <extension>
-	<name>Kindle Flight Board</name>
-	<version>1.0.0</version>
-	<author>Antigravity AI</author>
-	<id>kindle_flight_board</id>
+	<information>
+		<name>Kindle Flight Board</name>
+		<version>1.0</version>
+		<author>Antigravity AI</author>
+		<id>flightboard</id>
+	</information>
+	<menus>
+		<menu type="json" dynamic="true">menu.json</menu>
+	</menus>
 </extension>

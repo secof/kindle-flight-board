@@ -55,37 +55,86 @@ class BoardRenderer:
         self._font_badge = default_font
         self._fonts_loaded = True
 
-    def _load_airline_logo(self, airline_icao: str, max_width: int, max_height: int) -> Image.Image:
-        """Load logo from assets/logos/{ICAO}.png or render fallback badge."""
-        logo_path = settings.LOGOS_DIR / f"{airline_icao.upper()}.png"
-        default_logo_path = settings.LOGOS_DIR / "DEFAULT.png"
+    def _get_aliases_map(self) -> dict:
+        """Cache and return the alias dictionary from assets/logos/aliases.json if present."""
+        if hasattr(self, "_aliases_map") and self._aliases_map is not None:
+            return self._aliases_map
 
-        target_file = logo_path if logo_path.exists() else (default_logo_path if default_logo_path.exists() else None)
+        aliases_file = settings.LOGOS_DIR / "aliases.json"
+        if aliases_file.exists():
+            try:
+                import json
+                with open(aliases_file, "r", encoding="utf-8") as f:
+                    self._aliases_map = json.load(f)
+                    return self._aliases_map
+            except Exception as e:
+                logger.warning("Failed to load aliases.json: %s", e)
+
+        self._aliases_map = {}
+        return self._aliases_map
+
+    def _load_airline_logo(
+        self, airline_icao: str, flight_number: str, max_width: int, max_height: int
+    ) -> Image.Image:
+        """Load logo from assets/logos/ using ICAO, flight number prefix, or alias mappings."""
+        candidates = []
+
+        if airline_icao:
+            candidates.append(airline_icao.upper())
+
+        if flight_number and len(flight_number) >= 2:
+            prefix = flight_number.strip().split()[0][:2].upper()
+            if prefix.isalnum() and prefix not in candidates:
+                candidates.append(prefix)
+
+        # Expand candidates with alias mapping
+        aliases_map = self._get_aliases_map()
+        for cand in list(candidates):
+            for primary, aliases in aliases_map.items():
+                if cand == primary or cand in aliases:
+                    if primary not in candidates:
+                        candidates.append(primary)
+                    for alt in aliases:
+                        if alt not in candidates:
+                            candidates.append(alt)
+
+        target_file = None
+        for code in candidates:
+            path = settings.LOGOS_DIR / f"{code}.png"
+            if path.exists():
+                target_file = path
+                break
+
+        if not target_file:
+            default_logo_path = settings.LOGOS_DIR / "DEFAULT.png"
+            if default_logo_path.exists():
+                target_file = default_logo_path
 
         if target_file:
             try:
                 logo_img = Image.open(target_file).convert("RGBA")
                 logo_img.thumbnail((max_width, max_height), Image.Resampling.LANCZOS)
                 
-                canvas = Image.new("RGBA", (max_width, max_height), (255, 255, 255, 0))
+                # Solid white background (alpha=255) to prevent eips transparency bleed-through
+                canvas = Image.new("RGBA", (max_width, max_height), (255, 255, 255, 255))
                 offset_x = (max_width - logo_img.width) // 2
                 offset_y = (max_height - logo_img.height) // 2
                 canvas.paste(logo_img, (offset_x, offset_y), logo_img)
-                return canvas
+                return canvas.convert("L")
             except Exception as e:
                 logger.warning("Failed to load logo image %s: %s", target_file, str(e))
 
-        # Fallback badge logo
-        badge = Image.new("RGBA", (max_width, max_height), (255, 255, 255, 0))
+        # Fallback badge logo with solid white background
+        badge = Image.new("RGBA", (max_width, max_height), (255, 255, 255, 255))
         draw = ImageDraw.Draw(badge)
         draw.rounded_rectangle([2, 2, max_width - 2, max_height - 2], radius=8, outline=(0, 0, 0, 255), width=3)
         draw.rectangle([6, 6, max_width - 6, max_height - 6], fill=(235, 235, 235, 255))
         
-        text = airline_icao[:3].upper()
+        text = (airline_icao[:3] if airline_icao else flight_number[:2]).upper()
         draw.text((max_width // 2, max_height // 2), text, fill=(0, 0, 0, 255), font=self._font_row_medium, anchor="mm")
-        return badge
+        return badge.convert("L")
 
-    def render(self, data: FlightBoardData) -> bytes:
+    def render(self, data: FlightBoardData, rotate_override: Optional[int] = None) -> bytes:
         """Render high-contrast landscape e-ink flight board to PNG bytes."""
         self._init_fonts()
 
@@ -143,7 +192,7 @@ class BoardRenderer:
 
             # Col B: Airline Logo (Width ~ 110px)
             logo_w, logo_h = 110, 70
-            logo_img = self._load_airline_logo(flight.airline_icao, logo_w, logo_h)
+            logo_img = self._load_airline_logo(flight.airline_icao, flight.flight_number, logo_w, logo_h)
             logo_x = 155
             logo_y = row_y1 + (row_height - 10 - logo_h) // 2
             img.paste(logo_img.convert("L"), (logo_x, logo_y))
@@ -189,8 +238,9 @@ class BoardRenderer:
         draw.text((self.width - 40, footer_y), f"HASH: {data.data_hash}", fill=120, font=self._font_row_small, anchor="rt")
 
         # Apply rotation if configured
-        if settings.ROTATE_DEGREES in (90, 180, 270):
-            img = img.rotate(settings.ROTATE_DEGREES, expand=True)
+        rotation = rotate_override if rotate_override is not None else settings.ROTATE_DEGREES
+        if rotation in (90, 180, 270):
+            img = img.rotate(rotation, expand=True)
 
         # Apply color inversion if requested
         if settings.INVERT_COLORS:
