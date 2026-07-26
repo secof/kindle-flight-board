@@ -7,7 +7,8 @@
 SERVER_URL="http://192.168.1.100:8000"
 POLL_INTERVAL=60           # Seconds between polling checks
 TOGGLE_WIFI=0             # Set to 1 to disable Wi-Fi between updates for maximum battery
-ROTATE=90                 # 90 or 270 degrees rotation for landscape view on Kindle e-ink
+ROTATE=0                  # 0 for 800x600 landscape, 90/270 for portrait rotation
+STOP_FRAMEWORK=1          # Set to 1 to freeze Kindle cvm UI (prevents 'From your library' repaint)
 LOG_FILE="/tmp/flightboard.log"
 HASH_FILE="/tmp/flightboard_last_hash.txt"
 IMAGE_FILE="/tmp/flightboard_board.png"
@@ -45,6 +46,16 @@ init_kindle_environment() {
     log "Initializing Kindle FW 5.17 (Winterbreak) environment..."
     # Prevent Kindle powerd from auto-sleeping / going to screensaver
     $LIPC_CMD com.lab126.powerd preventScreenSaver 1 2>/dev/null
+    
+    # Switch to blank canvas app to remove Home Screen UI
+    $LIPC_CMD com.lab126.appmgrd start app://com.lab126.blank 2>/dev/null
+    sleep 1
+
+    # Freeze cvm Java UI framework to prevent 'From your library' repainting over display
+    if [ "${STOP_FRAMEWORK:-1}" -eq 1 ]; then
+        log "Freezing cvm UI thread (killall -STOP cvm)..."
+        killall -STOP cvm 2>/dev/null
+    fi
 }
 
 enable_wifi() {
@@ -80,10 +91,6 @@ display_error() {
 display_image() {
     log "Updating e-ink display with new board image ($IMAGE_FILE)..."
     
-    # Open Kindle blank app canvas to remove 'From your library' home screen cleanly
-    $LIPC_CMD com.lab126.appmgrd start app://com.lab126.blank 2>/dev/null
-    sleep 1
-
     # Keep screensaver disabled
     $LIPC_CMD com.lab126.powerd preventScreenSaver 1 2>/dev/null
 

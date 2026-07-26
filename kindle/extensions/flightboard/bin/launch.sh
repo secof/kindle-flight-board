@@ -26,12 +26,21 @@ case "$action" in
             echo "Stopping Flight Board Daemon (PID: $PID)..."
             kill "$PID" 2>/dev/null
             rm -f "$PID_FILE"
+            
+            # Unfreeze Kindle cvm UI thread
+            killall -CONT cvm 2>/dev/null
+            
             # Re-enable standard screen saver
             lipc-set-prop com.lab126.powerd preventScreenSaver 0 2>/dev/null
+            
             # Return to Kindle Home Screen booklet
             lipc-set-prop com.lab126.appmgrd start app://com.lab126.booklet.home 2>/dev/null
         else
             echo "Daemon is not running."
+            # Ensure cvm is unfrozen in all cases
+            killall -CONT cvm 2>/dev/null
+            lipc-set-prop com.lab126.powerd preventScreenSaver 0 2>/dev/null
+            lipc-set-prop com.lab126.appmgrd start app://com.lab126.booklet.home 2>/dev/null
         fi
         ;;
     status)

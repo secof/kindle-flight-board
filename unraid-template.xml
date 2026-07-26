@@ -24,11 +24,11 @@
   <DonateLink/>
   <Requires/>
   <Config Name="Host Port 8000" Target="8000" Default="8000" Mode="tcp" Description="Backend API Port" Type="Port" Display="always" Required="true" Mask="false">8000</Config>
-  <Config Name="AIRPORT_ICAO" Target="AIRPORT_ICAO" Default="KJFK" Description="Target Airport ICAO Code (e.g. KLAX, EGLL, KJFK)" Type="Variable" Display="always" Required="true" Mask="false">KJFK</Config>
-  <Config Name="AIRPORT_NAME" Target="AIRPORT_NAME" Default="John F. Kennedy Intl" Description="Display Name for Airport Header" Type="Variable" Display="always" Required="false" Mask="false">John F. Kennedy Intl</Config>
-  <Config Name="TIMEZONE" Target="TIMEZONE" Default="America/New_York" Description="Local Timezone Name" Type="Variable" Display="always" Required="true" Mask="false">America/New_York</Config>
-  <Config Name="BOARD_WIDTH" Target="BOARD_WIDTH" Default="1448" Description="Kindle Image Width in Pixels" Type="Variable" Display="advanced" Required="false" Mask="false">1448</Config>
-  <Config Name="BOARD_HEIGHT" Target="BOARD_HEIGHT" Default="1072" Description="Kindle Image Height in Pixels" Type="Variable" Display="advanced" Required="false" Mask="false">1072</Config>
-  <Config Name="ROTATE_DEGREES" Target="ROTATE_DEGREES" Default="0" Description="Rotate Image: 0, 90, 180, 270" Type="Variable" Display="advanced" Required="false" Mask="false">0</Config>
+  <Config Name="AIRPORT_ICAO" Target="AIRPORT_ICAO" Default="LRBS" Description="Target Airport ICAO Code (e.g. KLAX, EGLL, KJFK)" Type="Variable" Display="always" Required="true" Mask="false">KJFK</Config>
+  <Config Name="AIRPORT_NAME" Target="AIRPORT_NAME" Default="Aeroportul Internațional București Băneasa - Aurel Vlaicu" Description="Display Name for Airport Header" Type="Variable" Display="always" Required="false" Mask="false">John F. Kennedy Intl</Config>
+  <Config Name="TIMEZONE" Target="TIMEZONE" Default="Europe/Bucharest" Description="Local Timezone Name" Type="Variable" Display="always" Required="true" Mask="false">America/New_York</Config>
+  <Config Name="BOARD_WIDTH" Target="BOARD_WIDTH" Default="800" Description="Kindle Image Width in Pixels" Type="Variable" Display="advanced" Required="false" Mask="false">1448</Config>
+  <Config Name="BOARD_HEIGHT" Target="BOARD_HEIGHT" Default="600" Description="Kindle Image Height in Pixels" Type="Variable" Display="advanced" Required="false" Mask="false">1072</Config>
+  <Config Name="ROTATE_DEGREES" Target="ROTATE_DEGREES" Default="90" Description="Rotate Image: 0, 90, 180, 270" Type="Variable" Display="advanced" Required="false" Mask="false">0</Config>
   <Config Name="Assets Storage" Target="/app/assets" Default="/mnt/user/appdata/kindle-flight-board/assets" Description="Volume mount for custom logos and fonts" Type="Path" Display="always" Required="false" Mask="false">/mnt/user/appdata/kindle-flight-board/assets</Config>
 </Container>
