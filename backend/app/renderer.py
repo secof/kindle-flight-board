@@ -23,18 +23,19 @@ class BoardRenderer:
         self._font_row_small = None
         self._font_badge = None
         self._font_time_large = None
+        self._font_route = None
 
     def _init_fonts(self):
-        """Load doubled font sizes for maximum e-ink readability."""
+        """Load massive tripled font sizes for maximum readability on e-ink."""
         w = self.width
-        title_size = max(24, int(w * 0.050))
-        header_size = max(18, int(w * 0.030))
-        bold_size = max(26, int(w * 0.056))        # ~45px at 800w
-        time_large_size = max(32, int(w * 0.066))   # ~53px at 800w
-        route_size = max(22, int(w * 0.046))        # ~37px at 800w
-        medium_size = max(18, int(w * 0.032))       # ~26px at 800w
-        small_size = max(16, int(w * 0.028))        # ~22px at 800w
-        badge_size = max(16, int(w * 0.030))        # ~24px at 800w
+        title_size = max(36, int(w * 0.080))
+        header_size = max(26, int(w * 0.050))
+        bold_size = max(36, int(w * 0.082))         # ~66px at 800w
+        time_large_size = max(42, int(w * 0.095))   # ~76px at 800w
+        route_size = max(30, int(w * 0.068))        # ~54px at 800w
+        medium_size = max(24, int(w * 0.048))       # ~38px at 800w
+        small_size = max(20, int(w * 0.040))        # ~32px at 800w
+        badge_size = max(22, int(w * 0.045))        # ~36px at 800w
 
         font_dir = settings.ASSETS_DIR / "fonts"
         ttf_files = list(font_dir.glob("*.ttf")) if font_dir.exists() else []
@@ -173,7 +174,7 @@ class BoardRenderer:
         return fallback
 
     def render(self, data: FlightBoardData, rotate_override: Optional[int] = None) -> bytes:
-        """Render high-contrast e-ink flight board using assets/plane PNG icons."""
+        """Render high-contrast e-ink flight board with massive tripled font sizes."""
         self._init_fonts()
 
         w, h = self.width, self.height
@@ -185,18 +186,18 @@ class BoardRenderer:
         flights = data.flights[:4]  # Exactly 4 flights
 
         # Proportional dimensions based on width and row height
-        icon_w = int(w * 0.085)
-        icon_h = int(row_height * 0.65)
+        icon_w = int(w * 0.090)
+        icon_h = int(row_height * 0.70)
 
         logo_w = int(w * 0.17)
-        logo_h = int(row_height * 0.65)
+        logo_h = int(row_height * 0.70)
 
-        col_icon_x = int(w * 0.015)
-        col_logo_x = col_icon_x + icon_w + int(w * 0.015)
-        col_c_x = col_logo_x + logo_w + int(w * 0.025)   # Flight Number & Airline
-        col_d_x = int(w * 0.510)                            # Time (Label on top, Big 54px Time)
-        col_e_x = int(w * 0.680)                            # Route (Origin -> Destination)
-        col_g_x = w - int(w * 0.015)                        # Live Status Pill (Right-aligned)
+        col_icon_x = int(w * 0.012)
+        col_logo_x = col_icon_x + icon_w + int(w * 0.012)
+        col_c_x = col_logo_x + logo_w + int(w * 0.020)   # Flight Number & Airline Name
+        col_d_x = int(w * 0.500)                            # Time (Label on top, Huge Time)
+        col_e_x = int(w * 0.670)                            # Route (Origin -> Destination)
+        col_g_x = w - int(w * 0.012)                        # Live Status Pill (Right-aligned)
 
         for idx, flight in enumerate(flights):
             row_y1 = idx * row_height + 3
@@ -204,7 +205,7 @@ class BoardRenderer:
             bg_color = 255 if idx % 2 == 0 else 248
 
             # Outer Row Container Box
-            draw.rounded_rectangle([int(w * 0.008), row_y1, w - int(w * 0.008), row_y2], radius=10, fill=bg_color, outline=0, width=2)
+            draw.rounded_rectangle([int(w * 0.006), row_y1, w - int(w * 0.006), row_y2], radius=10, fill=bg_color, outline=0, width=2)
 
             # Col A: Plane Icon (departure.png or landing.png from assets/plane/)
             plane_icon = self._load_plane_icon(flight.flight_type, icon_w, icon_h)
@@ -216,35 +217,36 @@ class BoardRenderer:
             logo_y = row_y1 + (row_height - 6 - logo_h) // 2
             img.paste(logo_img, (col_logo_x, logo_y))
 
-            y_top_text = row_y1 + int(row_height * 0.14)
-            y_mid_time = row_y1 + int(row_height * 0.38)
-            y_sub_text = row_y1 + int(row_height * 0.60)
+            y_top_label = row_y1 + int(row_height * 0.10)
+            y_top_text = row_y1 + int(row_height * 0.12)
+            y_mid_time = row_y1 + int(row_height * 0.35)
+            y_sub_text = row_y1 + int(row_height * 0.58)
 
-            # Col C: Flight Number & Airline Name (BIGGER Font, No extra labels)
+            # Col C: Flight Number & Airline Name (TRIPLED Font Sizes)
             draw.text((col_c_x, y_top_text), flight.flight_number, fill=0, font=self._font_row_bold)
-            draw.text((col_c_x, y_sub_text), flight.airline_name[:16], fill=90, font=self._font_row_medium)
+            draw.text((col_c_x, y_sub_text), flight.airline_name[:14], fill=90, font=self._font_row_medium)
 
-            # Col D: Time (Label ON TOP of Time, DOUBLED Time Text!)
+            # Col D: Time (Label ON TOP of Time, HUGE TRIPLED Time Text!)
             time_label = "DEP TIME" if flight.flight_type == "DEP" else "ARR TIME"
-            draw.text((col_d_x, y_top_text), time_label, fill=90, font=self._font_row_small)
+            draw.text((col_d_x, y_top_label), time_label, fill=90, font=self._font_row_small)
             draw.text((col_d_x, y_mid_time), flight.scheduled_time, fill=0, font=self._font_time_large)
 
-            # Col E: Route (Origin ✈ Destination, BIGGER Font, No extra labels)
+            # Col E: Route (Origin ✈ Destination, TRIPLED Font Sizes)
             route_str = f"{flight.origin} ✈ {flight.destination}"
             draw.text((col_e_x, y_top_text), route_str, fill=0, font=self._font_route)
             if flight.aircraft_type:
                 draw.text((col_e_x, y_sub_text), flight.aircraft_type, fill=100, font=self._font_row_medium)
 
             # Col F: Live Status Pill (Right-Aligned)
-            badge_w, badge_h = int(w * 0.135), int(row_height * 0.38)
-            badge_rect = [col_g_x - badge_w, row_y1 + int(row_height * 0.31), col_g_x, row_y1 + int(row_height * 0.31) + badge_h]
+            badge_w, badge_h = int(w * 0.140), int(row_height * 0.40)
+            badge_rect = [col_g_x - badge_w, row_y1 + int(row_height * 0.30), col_g_x, row_y1 + int(row_height * 0.30) + badge_h]
             
             is_delayed = "Delay" in flight.status or "Late" in flight.status
             status_bg = 0 if is_delayed else 225
             status_fg = 255 if is_delayed else 0
             
             draw.rounded_rectangle(badge_rect, radius=8, fill=status_bg, outline=0, width=2)
-            draw.text((col_g_x - badge_w // 2, row_y1 + int(row_height * 0.31) + badge_h // 2), flight.status[:16], fill=status_fg, font=self._font_badge, anchor="mm")
+            draw.text((col_g_x - badge_w // 2, row_y1 + int(row_height * 0.30) + badge_h // 2), flight.status[:14], fill=status_fg, font=self._font_badge, anchor="mm")
 
         # Apply rotation if configured
         rotation = rotate_override if rotate_override is not None else settings.ROTATE_DEGREES
