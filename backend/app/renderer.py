@@ -22,16 +22,18 @@ class BoardRenderer:
         self._font_row_medium = None
         self._font_row_small = None
         self._font_badge = None
+        self._font_time_large = None
 
     def _init_fonts(self):
         """Load fonts with dynamic sizes proportional to self.width."""
         w = self.width
-        title_size = max(18, int(w * 0.027))
-        header_size = max(14, int(w * 0.018))
-        bold_size = max(16, int(w * 0.023))
-        medium_size = max(13, int(w * 0.017))
-        small_size = max(11, int(w * 0.013))
-        badge_size = max(12, int(w * 0.015))
+        title_size = max(18, int(w * 0.035))
+        header_size = max(14, int(w * 0.022))
+        bold_size = max(18, int(w * 0.035))
+        time_large_size = max(22, int(w * 0.046))
+        medium_size = max(14, int(w * 0.022))
+        small_size = max(12, int(w * 0.018))
+        badge_size = max(11, int(w * 0.016))
 
         font_dir = settings.ASSETS_DIR / "fonts"
         ttf_files = list(font_dir.glob("*.ttf")) if font_dir.exists() else []
@@ -42,6 +44,7 @@ class BoardRenderer:
                 self._font_title = ImageFont.truetype(font_path, title_size)
                 self._font_header = ImageFont.truetype(font_path, header_size)
                 self._font_row_bold = ImageFont.truetype(font_path, bold_size)
+                self._font_time_large = ImageFont.truetype(font_path, time_large_size)
                 self._font_row_medium = ImageFont.truetype(font_path, medium_size)
                 self._font_row_small = ImageFont.truetype(font_path, small_size)
                 self._font_badge = ImageFont.truetype(font_path, badge_size)
@@ -55,6 +58,7 @@ class BoardRenderer:
         self._font_title = default_font
         self._font_header = default_font
         self._font_row_bold = default_font
+        self._font_time_large = default_font
         self._font_row_medium = default_font
         self._font_row_small = default_font
         self._font_badge = default_font
@@ -139,120 +143,106 @@ class BoardRenderer:
         draw.text((max_width // 2, max_height // 2), text, fill=(0, 0, 0, 255), font=self._font_row_medium, anchor="mm")
         return badge.convert("L")
 
+    def _draw_type_symbol(self, draw: ImageDraw.ImageDraw, x1: int, y1: int, w: int, h: int, flight_type: str):
+        """Draw high-contrast DEP/ARR vector badge with custom vector arrows (no font dependency)."""
+        is_dep = (flight_type == "DEP")
+        bg_color = 0 if is_dep else 235
+        fg_color = 255 if is_dep else 0
+        border_color = 0
+        
+        # Outer badge box
+        draw.rounded_rectangle([x1, y1, x1 + w, y1 + h], radius=8, fill=bg_color, outline=border_color, width=2)
+        
+        # Center coords for arrow
+        cx = x1 + w // 2
+        cy = y1 + int(h * 0.38)
+        arrow_size = int(min(w, h) * 0.22)
+        
+        if is_dep:
+            # Up-Right arrow (DEP ↗)
+            draw.line([(cx - arrow_size, cy + arrow_size), (cx + arrow_size, cy - arrow_size)], fill=fg_color, width=4)
+            draw.line([(cx + arrow_size, cy - arrow_size), (cx + arrow_size - 8, cy - arrow_size)], fill=fg_color, width=4)
+            draw.line([(cx + arrow_size, cy - arrow_size), (cx + arrow_size, cy - arrow_size + 8)], fill=fg_color, width=4)
+            draw.text((x1 + w // 2, y1 + int(h * 0.78)), "DEP", fill=fg_color, font=self._font_badge, anchor="mm")
+        else:
+            # Down-Right arrow (ARR ↘)
+            draw.line([(cx - arrow_size, cy - arrow_size), (cx + arrow_size, cy + arrow_size)], fill=fg_color, width=4)
+            draw.line([(cx + arrow_size, cy + arrow_size), (cx + arrow_size - 8, cy + arrow_size)], fill=fg_color, width=4)
+            draw.line([(cx + arrow_size, cy + arrow_size), (cx + arrow_size, cy + arrow_size - 8)], fill=fg_color, width=4)
+            draw.text((x1 + w // 2, y1 + int(h * 0.78)), "ARR", fill=fg_color, font=self._font_badge, anchor="mm")
+
     def render(self, data: FlightBoardData, rotate_override: Optional[int] = None) -> bytes:
-        """Render high-contrast landscape e-ink flight board to PNG bytes."""
+        """Render high-contrast e-ink flight board (Header & Footer removed, 4 large flight rows)."""
         self._init_fonts()
 
-        img = Image.new("L", (self.width, self.height), color=255)
-        draw = ImageDraw.Draw(img)
         w, h = self.width, self.height
+        img = Image.new("L", (w, h), color=255)
+        draw = ImageDraw.Draw(img)
 
-        # 1. HEADER SECTION
-        header_height = int(h * 0.12)
-        draw.rectangle([0, 0, w, header_height], fill=245)
-        
-        # Title & Airport Name
-        pad_x = int(w * 0.028)
-        draw.text((pad_x, int(header_height * 0.17)), f"✈  {data.airport_name.upper()} ({data.airport_icao})", fill=0, font=self._font_title)
-        draw.text((pad_x, int(header_height * 0.60)), "UPCOMING FLIGHT DEPARTURES & ARRIVALS", fill=80, font=self._font_header)
-
-        # Metadata & Status Pill
-        meta_str = f"UPDATED: {data.last_updated}"
-        draw.text((w - pad_x, int(header_height * 0.25)), meta_str, fill=60, font=self._font_row_small, anchor="rt")
-        
-        pill_w, pill_h = int(w * 0.16), int(header_height * 0.30)
-        status_pill_rect = [w - pad_x - pill_w, int(header_height * 0.52), w - pad_x, int(header_height * 0.52) + pill_h]
-        draw.rounded_rectangle(status_pill_rect, radius=6, fill=0)
-        draw.text((w - pad_x - pill_w // 2, int(header_height * 0.52) + pill_h // 2), "LIVE • FLIGHTRADAR24", fill=255, font=self._font_row_small, anchor="mm")
-
-        # Dividing header line
-        draw.line([(0, header_height), (w, header_height)], fill=0, width=4)
-
-        # 2. FLIGHT TABLE ROWS (Exactly 4 upcoming flights)
-        table_top = header_height + 12
-        table_bottom = h - int(h * 0.038)
-        total_table_height = table_bottom - table_top
-        row_height = total_table_height // 4
-
+        # 4 FLIGHT TABLE ROWS (HEADER & FOOTER REMOVED FOR MAXIMUM SPACE)
+        row_height = h // 4
         flights = data.flights[:4]  # Exactly 4 flights
 
-        # Relative Column Offsets
-        col_type_x1 = int(w * 0.024)
-        type_pill_w = int(w * 0.073)
-        type_pill_h = int(row_height * 0.38)
+        # Proportional dimensions based on width and row height
+        type_symbol_w = int(w * 0.085)
+        type_symbol_h = int(row_height * 0.58)
 
-        logo_x = int(w * 0.11)
-        logo_w = int(w * 0.076)
-        logo_h = int(row_height * 0.55)
+        logo_w = int(w * 0.16)
+        logo_h = int(row_height * 0.62)
 
-        col_c_x = int(w * 0.195)   # Flight Number & Airline
-        col_d_x = int(w * 0.355)   # Scheduled Time
-        col_e_x = int(w * 0.480)   # Route (Origin -> Destination)
-        col_f_x = int(w * 0.700)   # Aircraft Type
-        col_g_x = w - int(w * 0.03) # Live Status Pill (Right-aligned)
+        col_type_x = int(w * 0.02)
+        col_logo_x = col_type_x + type_symbol_w + int(w * 0.02)
+        col_c_x = col_logo_x + logo_w + int(w * 0.025)  # Flight Number & Airline
+        col_d_x = int(w * 0.50)                           # Time (Label on top, Big Time)
+        col_e_x = int(w * 0.68)                           # Route (Origin -> Destination)
+        col_g_x = w - int(w * 0.02)                       # Live Status Pill (Right-aligned)
 
         for idx, flight in enumerate(flights):
-            row_y1 = table_top + idx * row_height
-            row_y2 = row_y1 + row_height - int(row_height * 0.08)
+            row_y1 = idx * row_height + 4
+            row_y2 = row_y1 + row_height - 8
             bg_color = 255 if idx % 2 == 0 else 248
 
             # Outer Row Container Box
-            draw.rounded_rectangle([int(w * 0.014), row_y1, w - int(w * 0.014), row_y2], radius=10, fill=bg_color, outline=0, width=2)
+            draw.rounded_rectangle([int(w * 0.01), row_y1, w - int(w * 0.01), row_y2], radius=10, fill=bg_color, outline=0, width=2)
 
-            # Col A: Flight Type Badge (DEP ↗ / ARR ↘)
-            type_y1 = row_y1 + (row_height - int(row_height * 0.08) - type_pill_h) // 2
-            type_x2 = col_type_x1 + type_pill_w
-            type_y2 = type_y1 + type_pill_h
-            
-            if flight.flight_type == "DEP":
-                draw.rounded_rectangle([col_type_x1, type_y1, type_x2, type_y2], radius=6, fill=0)
-                draw.text(((col_type_x1 + type_x2) // 2, (type_y1 + type_y2) // 2), "DEP ↗", fill=255, font=self._font_badge, anchor="mm")
-            else:
-                draw.rounded_rectangle([col_type_x1, type_y1, type_x2, type_y2], radius=6, fill=220, outline=0, width=2)
-                draw.text(((col_type_x1 + type_x2) // 2, (type_y1 + type_y2) // 2), "ARR ↘", fill=0, font=self._font_badge, anchor="mm")
+            # Col A: Vector DEP / ARR Symbol Badge (To the left of logo, same scale)
+            type_symbol_y = row_y1 + (row_height - 8 - type_symbol_h) // 2
+            self._draw_type_symbol(draw, col_type_x, type_symbol_y, type_symbol_w, type_symbol_h, flight.flight_type)
 
-            # Col B: Airline Logo
+            # Col B: Airline Logo (Bigger!)
             logo_img = self._load_airline_logo(flight.airline_icao, flight.flight_number, logo_w, logo_h)
-            logo_y = row_y1 + (row_height - int(row_height * 0.08) - logo_h) // 2
-            img.paste(logo_img, (logo_x, logo_y))
+            logo_y = row_y1 + (row_height - 8 - logo_h) // 2
+            img.paste(logo_img, (col_logo_x, logo_y))
 
-            y_top_text = row_y1 + int(row_height * 0.33)
-            y_sub_text = row_y1 + int(row_height * 0.70)
+            y_top_text = row_y1 + int(row_height * 0.22)
+            y_mid_text = row_y1 + int(row_height * 0.35)
+            y_sub_text = row_y1 + int(row_height * 0.65)
 
-            # Col C: Flight Number & Airline Name
+            # Col C: Flight Number & Airline Name (No extra labels)
             draw.text((col_c_x, y_top_text), flight.flight_number, fill=0, font=self._font_row_bold)
-            draw.text((col_c_x, y_sub_text), flight.airline_name[:20], fill=90, font=self._font_row_small)
+            draw.text((col_c_x, y_sub_text), flight.airline_name[:18], fill=90, font=self._font_row_small)
 
-            # Col D: Scheduled Time (SCHED)
-            draw.text((col_d_x, y_top_text), flight.scheduled_time, fill=0, font=self._font_row_bold)
-            draw.text((col_d_x, y_sub_text), "SCHED TIME", fill=110, font=self._font_row_small)
+            # Col D: Time (Label ON TOP of Time, BIGGER Time Text!)
+            time_label = "DEP TIME" if flight.flight_type == "DEP" else "ARR TIME"
+            draw.text((col_d_x, y_top_text), time_label, fill=90, font=self._font_row_small)
+            draw.text((col_d_x, y_mid_text), flight.scheduled_time, fill=0, font=self._font_time_large)
 
-            # Col E: Route (Origin -> Destination)
+            # Col E: Route (Origin -> Destination, No extra labels)
             route_str = f"{flight.origin}  ✈  {flight.destination}"
             draw.text((col_e_x, y_top_text), route_str, fill=0, font=self._font_row_bold)
-            route_sub = "DEPARTURE" if flight.flight_type == "DEP" else "ARRIVAL"
-            draw.text((col_e_x, y_sub_text), f"FLIGHT {route_sub}", fill=90, font=self._font_row_small)
+            if flight.aircraft_type:
+                draw.text((col_e_x, y_sub_text), flight.aircraft_type, fill=100, font=self._font_row_small)
 
-            # Col F: Aircraft Type
-            draw.text((col_f_x, y_top_text), flight.aircraft_type, fill=0, font=self._font_row_medium)
-            draw.text((col_f_x, y_sub_text), "AIRCRAFT", fill=110, font=self._font_row_small)
-
-            # Col G: Live Status Pill (Right-Aligned)
-            badge_w, badge_h = int(w * 0.16), int(row_height * 0.40)
-            badge_rect = [col_g_x - badge_w, row_y1 + int(row_height * 0.30), col_g_x, row_y1 + int(row_height * 0.30) + badge_h]
+            # Col F: Live Status Pill (Right-Aligned)
+            badge_w, badge_h = int(w * 0.14), int(row_height * 0.36)
+            badge_rect = [col_g_x - badge_w, row_y1 + int(row_height * 0.32), col_g_x, row_y1 + int(row_height * 0.32) + badge_h]
             
             is_delayed = "Delay" in flight.status or "Late" in flight.status
             status_bg = 0 if is_delayed else 225
             status_fg = 255 if is_delayed else 0
             
             draw.rounded_rectangle(badge_rect, radius=8, fill=status_bg, outline=0, width=2)
-            draw.text((col_g_x - badge_w // 2, row_y1 + int(row_height * 0.30) + badge_h // 2), flight.status[:22], fill=status_fg, font=self._font_row_small, anchor="mm")
-
-        # 3. FOOTER SECTION
-        footer_y = h - int(h * 0.030)
-        draw.line([(int(w * 0.014), footer_y - 8), (w - int(w * 0.014), footer_y - 8)], fill=180, width=1)
-        draw.text((pad_x, footer_y), f"Kindle Paperwhite Display (FW 5.17)  •  Flightradar24 API  •  Timezone: {settings.TIMEZONE}", fill=120, font=self._font_row_small)
-        draw.text((w - pad_x, footer_y), f"HASH: {data.data_hash}", fill=120, font=self._font_row_small, anchor="rt")
+            draw.text((col_g_x - badge_w // 2, row_y1 + int(row_height * 0.32) + badge_h // 2), flight.status[:18], fill=status_fg, font=self._font_badge, anchor="mm")
 
         # Apply rotation if configured
         rotation = rotate_override if rotate_override is not None else settings.ROTATE_DEGREES
@@ -263,7 +253,7 @@ class BoardRenderer:
         if settings.INVERT_COLORS:
             img = ImageOps.invert(img)
 
-        # Export to PNG buffer
+        # Export to 100% opaque PNG buffer
         output_buffer = io.BytesIO()
         img.save(output_buffer, format="PNG", optimize=True)
         return output_buffer.getvalue()

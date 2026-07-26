@@ -7,7 +7,7 @@
 SERVER_URL="http://192.168.1.100:8000"
 POLL_INTERVAL=60           # Seconds between polling checks
 TOGGLE_WIFI=0             # Set to 1 to disable Wi-Fi between updates for maximum battery
-ROTATE=0                  # 0 for 1448x1072 landscape, 90/270 for portrait rotation
+ROTATE=90                 # 90 or 270 degrees rotation for landscape view on Kindle e-ink
 LOG_FILE="/tmp/flightboard.log"
 HASH_FILE="/tmp/flightboard_last_hash.txt"
 IMAGE_FILE="/tmp/flightboard_board.png"
@@ -67,7 +67,7 @@ display_error() {
     url_target="$2"
     log "Displaying on-screen connection error (code $curl_err)..."
     
-    $EIPS_CMD -c 2>/dev/null
+    $EIPS_CMD -f -c 2>/dev/null
     sleep 1
     $EIPS_CMD 2 2 "=== KINDLE FLIGHT BOARD ERROR ===" 2>/dev/null
     $EIPS_CMD 2 4 "Failed to connect to backend server!" 2>/dev/null
@@ -80,18 +80,18 @@ display_error() {
 display_image() {
     log "Updating e-ink display with new board image ($IMAGE_FILE)..."
     
-    # Open Kindle blank app canvas to remove 'From your library' home screen cleanly without appmgrd errors
+    # Open Kindle blank app canvas to remove 'From your library' home screen cleanly
     $LIPC_CMD com.lab126.appmgrd start app://com.lab126.blank 2>/dev/null
     sleep 1
 
     # Keep screensaver disabled
     $LIPC_CMD com.lab126.powerd preventScreenSaver 1 2>/dev/null
 
-    # Clear screen to flash black/white and eliminate e-ink ghosting (FW 5.17)
-    $EIPS_CMD -c 2>/dev/null
+    # Hardware full-screen refresh to clear all layers and eliminate ghosting / bleeding
+    $EIPS_CMD -f -c 2>/dev/null
     sleep 1
-    # Render PNG image onto Kindle display
-    $EIPS_CMD -g "$IMAGE_FILE" 2>/dev/null
+    # Render PNG image onto full Kindle display
+    $EIPS_CMD -f -g "$IMAGE_FILE" 2>/dev/null
 }
 
 compute_hash() {
