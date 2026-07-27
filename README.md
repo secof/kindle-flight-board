@@ -26,7 +26,7 @@ graph TD
     B -->|Render 800x600 PNG| C[Pillow Graphics Engine]
     C -->|Expose Endpoints| D[Local Network: /changed & /board.png]
     
-    subgraph Kindle Paperwhite (FW 5.17 / Winterbreak)
+    subgraph Kindle["Kindle Paperwhite (FW 5.17 / Winterbreak)"]
         E[KUAL Menu / Launch Script] -->|Poll /changed| D
         D -->|If Hash Changed| F[Download /board.png]
         F -->|Clear & Draw eips -f -c -g| G[E-Ink Screen Update]
