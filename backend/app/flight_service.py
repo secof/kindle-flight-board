@@ -176,7 +176,7 @@ class FlightService:
                     continue
                 
                 effective_ts = est_ts or sched_ts
-                sort_ts = sched_ts or effective_ts
+                sort_ts = effective_ts
                 status_raw = flt.get("status", {}).get("text") or "SCHEDULED"
                 
                 # Exclude past flights or already departed/canceled flights
@@ -237,7 +237,7 @@ class FlightService:
                     continue
                 
                 effective_ts = est_ts or sched_ts
-                sort_ts = sched_ts or effective_ts
+                sort_ts = effective_ts
                 status_raw = flt.get("status", {}).get("text") or "SCHEDULED"
                 
                 # Exclude past flights or already landed/canceled flights
