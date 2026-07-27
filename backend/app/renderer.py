@@ -240,21 +240,35 @@ class BoardRenderer:
             # Col D: Scheduled Time (BIG Time Text, NO Label)
             draw.text((col_d_x, y_mid_time), flight.scheduled_time, fill=0, font=self._font_time_large)
 
-            # Col E: Target Airport ONLY (Destination for DEP, Origin for ARR)
-            target_airport = flight.destination if flight.flight_type == "DEP" else flight.origin
-            draw.text((col_e_x, y_top_text), target_airport, fill=0, font=self._font_route)
-            if flight.aircraft_type:
-                draw.text((col_e_x, y_sub_text), flight.aircraft_type, fill=100, font=self._font_row_medium)
+            # Col E: Target Airport Code (Line 1), City Name (Line 2), Aircraft Model (Line 3)
+            if flight.flight_type == "DEP":
+                target_airport = flight.destination
+                target_city = flight.destination_city
+            else:
+                target_airport = flight.origin
+                target_city = flight.origin_city
 
-            # Col F: Live Status Text (2 rows: Row 1 = EST or DLY, Row 2 = Time)
+            y_e_line1 = row_y1 + int(row_height * 0.14)
+            y_e_line2 = row_y1 + int(row_height * 0.42)
+            y_e_line3 = row_y1 + int(row_height * 0.68)
+
+            draw.text((col_e_x, y_e_line1), target_airport, fill=0, font=self._font_route)
+            if target_city:
+                draw.text((col_e_x, y_e_line2), target_city[:16], fill=90, font=self._font_row_medium)
+            if flight.aircraft_type:
+                draw.text((col_e_x, y_e_line3), flight.aircraft_type, fill=110, font=self._font_row_small)
+
+            # Col F: Live Status Text (2 rows: Row 1 = EST or DLY, Row 2 = Time) - CENTERED
             status_raw = flight.status.strip()
             is_delayed = ("Delay" in status_raw) or ("Late" in status_raw) or ("CANCEL" in status_raw.upper())
             
             status_label = "DLY" if is_delayed else "EST"
             status_time = flight.estimated_time or flight.scheduled_time
 
-            draw.text((col_g_x, y_top_text), status_label, fill=90, font=self._font_row_small, anchor="rt")
-            draw.text((col_g_x, y_sub_text), status_time, fill=0, font=self._font_route, anchor="rt")
+            col_f_center_x = int(w * 0.925)
+
+            draw.text((col_f_center_x, y_e_line1), status_label, fill=90, font=self._font_row_small, anchor="mt")
+            draw.text((col_f_center_x, y_e_line3), status_time, fill=0, font=self._font_route, anchor="mt")
 
         # Apply rotation if configured
         rotation = rotate_override if rotate_override is not None else settings.ROTATE_DEGREES

@@ -94,14 +94,14 @@ class FlightService:
         logger.warning("Generating 4 mock upcoming flights for airport %s", settings.AIRPORT_ICAO)
         
         mock_raw = [
-            ("DEP", "RYR9536", settings.AIRPORT_ICAO, "BRI", "B738", now + 600, "Estimated dep 23:50"),
-            ("ARR", "WZZ5975", "BUD", settings.AIRPORT_ICAO, "A21N", now + 1800, "Estimated arr 00:10"),
-            ("DEP", "WMT924", settings.AIRPORT_ICAO, "BGY", "A321", now + 3600, "Scheduled 01:00"),
-            ("ARR", "ROT101", "OTP", settings.AIRPORT_ICAO, "E190", now + 5400, "Scheduled 01:30"),
+            ("DEP", "RYR9536", settings.AIRPORT_ICAO, "Bucharest", "BGY", "Milan Bergamo", "B738", now + 600, "Estimated dep 23:50"),
+            ("ARR", "WZZ5975", "LTN", "London Luton", settings.AIRPORT_ICAO, "Bucharest", "A21N", now + 1800, "Estimated arr 00:10"),
+            ("DEP", "WMT924", settings.AIRPORT_ICAO, "Bucharest", "BGY", "Milan Bergamo", "A321", now + 3600, "Scheduled 01:00"),
+            ("ARR", "ROT101", "CLJ", "Cluj-Napoca", settings.AIRPORT_ICAO, "Bucharest", "E190", now + 5400, "Scheduled 01:30"),
         ]
         
         flights = []
-        for flt_type, callsign, orig, dest, ac_type, ts, status_str in mock_raw:
+        for flt_type, callsign, orig, orig_c, dest, dest_c, ac_type, ts, status_str in mock_raw:
             icao_prefix, airline_name, flt_num = self._get_airline_info({}, callsign)
             time_str = self._format_local_time(ts)
             
@@ -113,7 +113,9 @@ class FlightService:
                     flight_number=flt_num,
                     flight_type=flt_type,
                     origin=orig,
+                    origin_city=orig_c,
                     destination=dest,
+                    destination_city=dest_c,
                     aircraft_type=ac_type,
                     timestamp=ts,
                     scheduled_ts=ts,
@@ -193,11 +195,13 @@ class FlightService:
                 raw_aircraft = flt.get("aircraft") or {}
                 ac_type = self._get_aircraft_type(raw_aircraft, callsign)
                 
-                dest_code = flt.get("airport", {}).get("destination", {}).get("code", {}).get("iata") or \
-                            flt.get("airport", {}).get("destination", {}).get("code", {}).get("icao") or \
-                            flt.get("airport", {}).get("destination", {}).get("position", {}).get("region", {}).get("city") or "DEST"
+                dest_obj = flt.get("airport", {}).get("destination", {}) or {}
+                dest_code = dest_obj.get("code", {}).get("iata") or dest_obj.get("code", {}).get("icao") or "DEST"
+                dest_city = dest_obj.get("position", {}).get("region", {}).get("city") or dest_obj.get("name") or None
                 
-                orig_code = flt.get("airport", {}).get("origin", {}).get("code", {}).get("iata") or settings.AIRPORT_ICAO
+                orig_obj = flt.get("airport", {}).get("origin", {}) or {}
+                orig_code = orig_obj.get("code", {}).get("iata") or settings.AIRPORT_ICAO
+                orig_city = orig_obj.get("position", {}).get("region", {}).get("city") or orig_obj.get("name") or None
                 
                 sched_str = self._format_local_time(sched_ts)
                 est_str = self._format_local_time(est_ts) if est_ts else None
@@ -212,7 +216,9 @@ class FlightService:
                         flight_number=formatted_flt_num,
                         flight_type="DEP",
                         origin=orig_code,
+                        origin_city=orig_city,
                         destination=dest_code,
+                        destination_city=dest_city,
                         aircraft_type=ac_type,
                         timestamp=effective_ts,
                         scheduled_ts=sort_ts,
@@ -254,11 +260,13 @@ class FlightService:
                 raw_aircraft = flt.get("aircraft") or {}
                 ac_type = self._get_aircraft_type(raw_aircraft, callsign)
                 
-                orig_code = flt.get("airport", {}).get("origin", {}).get("code", {}).get("iata") or \
-                            flt.get("airport", {}).get("origin", {}).get("code", {}).get("icao") or \
-                            flt.get("airport", {}).get("origin", {}).get("position", {}).get("region", {}).get("city") or "ORIG"
+                orig_obj = flt.get("airport", {}).get("origin", {}) or {}
+                orig_code = orig_obj.get("code", {}).get("iata") or orig_obj.get("code", {}).get("icao") or "ORIG"
+                orig_city = orig_obj.get("position", {}).get("region", {}).get("city") or orig_obj.get("name") or None
                 
-                dest_code = flt.get("airport", {}).get("destination", {}).get("code", {}).get("iata") or settings.AIRPORT_ICAO
+                dest_obj = flt.get("airport", {}).get("destination", {}) or {}
+                dest_code = dest_obj.get("code", {}).get("iata") or settings.AIRPORT_ICAO
+                dest_city = dest_obj.get("position", {}).get("region", {}).get("city") or dest_obj.get("name") or None
                 
                 sched_str = self._format_local_time(sched_ts)
                 est_str = self._format_local_time(est_ts) if est_ts else None
@@ -273,7 +281,9 @@ class FlightService:
                         flight_number=formatted_flt_num,
                         flight_type="ARR",
                         origin=orig_code,
+                        origin_city=orig_city,
                         destination=dest_code,
+                        destination_city=dest_city,
                         aircraft_type=ac_type,
                         timestamp=effective_ts,
                         scheduled_ts=sort_ts,
