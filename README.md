@@ -1,17 +1,20 @@
 # Kindle Flight Board ✈️📺
 
-A smart-display system that turns a jailbroken **Amazon Kindle Paperwhite** into a live flight departures/arrivals board for any airport using the **OpenSky Network API** and a local **Unraid / Docker** backend.
+A smart-display system that turns a jailbroken **Amazon Kindle Paperwhite** into a live flight departures/arrivals board for any airport using the **Flightradar24 API** and a local **Unraid / Docker** backend.
 
 ---
 
 ## 🌟 Key Features
 
-- **Kindle FW 5.17 & Winterbreak Ready:** Designed specifically for Kindle Paperwhite on firmware 5.17 with KUAL integration.
+- **Kindle FW 5.17 & Winterbreak Ready:** Integrated blank canvas (`app://com.lab126.blank`) and Java UI background pausing (`killall -STOP cvm`) to permanently prevent *"From your library"* from repainting over your flight board.
+- **Flightradar24 API Integration:** Fetches live airport departure and arrival schedules sorted by real-time operational timestamps (`effective_ts`), properly handling delayed and early flights without premature drop-offs.
 - **Battery-Optimized Polling:** The Kindle checks a lightweight `/changed` hash endpoint before downloading new images, avoiding unnecessary Wi-Fi & e-ink redraw power draw.
-- **1 Past & 3 Future Flights:** Automatically sorts time data to display 1 recent departure/arrival alongside 3 upcoming scheduled flights.
-- **High-Contrast E-Ink Rendering:** Uses Python Pillow (PIL) to generate 1448x1072 landscape PNG images with crisp typography, airline logos, aircraft types, and status badges.
-- **Robust Error & Fallback Handling:** If OpenSky Network API rate-limits or experiences downtime, the system serves fallback mockups without crashing the Kindle display.
-- **Unraid & Docker Ready:** Includes `Dockerfile`, `docker-compose.yml`, and an Unraid XML container template for easy homelab deployment.
+- **102+ Airline Logos & Alias Resolution:** Includes 102 airline logos with automatic IATA/ICAO/subsidiary alias lookups (`W6`/`W4`/`WZZ` for Wizz Air, `FR`/`RK`/`RYR` for Ryanair, `RO`/`ROT` for TAROM, etc.).
+- **Custom Plane Graphics:** Uses high-contrast `departure.png` and `landing.png` vector plane icons positioned to the left of airline logos.
+- **Clear 3-Line Destination Layout:** Displays Airport Code (e.g. `BGY`), City Name (e.g. `Milan Bergamo`), and Aircraft Model (e.g. `A321`).
+- **Centered 2-Row Status Column:** Displays `EST` / `DLY` on top and the status time on the bottom line, centered horizontally.
+- **Pure White High-Contrast E-Ink Rendering:** Built with Python Pillow (PIL) and bundled TrueType fonts ([Arial.ttf](assets/fonts/Arial.ttf)) for maximum e-ink legibility and 100% pure white background (`fill=255`).
+- **Unraid & Docker Ready:** Published to GitHub Container Registry (`ghcr.io/secof/kindle-flight-board:latest`) with automatic `/app/assets` volume population so custom logos & fonts can be mounted seamlessly.
 
 ---
 
@@ -19,14 +22,14 @@ A smart-display system that turns a jailbroken **Amazon Kindle Paperwhite** into
 
 ```mermaid
 graph TD
-    A[OpenSky Network API] -->|JSON Flight Data| B[Backend Server - FastAPI]
-    B -->|Render 1448x1072 PNG| C[Pillow Graphics Engine]
+    A[Flightradar24 API] -->|JSON Flight Data| B[Backend Server - FastAPI]
+    B -->|Render 800x600 PNG| C[Pillow Graphics Engine]
     C -->|Expose Endpoints| D[Local Network: /changed & /board.png]
     
-    subgraph Kindle Paperwhite FW 5.17
+    subgraph Kindle Paperwhite (FW 5.17 / Winterbreak)
         E[KUAL Menu / Launch Script] -->|Poll /changed| D
         D -->|If Hash Changed| F[Download /board.png]
-        F -->|Clear & Draw eips -c -g| G[E-Ink Screen Update]
+        F -->|Clear & Draw eips -f -c -g| G[E-Ink Screen Update]
     end
 ```
 
@@ -37,27 +40,29 @@ graph TD
 ```
 kindle-flight-board/
 ├── assets/
-│   ├── fonts/               # Custom fonts (Roboto, DejaVu, Inter)
-│   └── logos/               # Airline logo PNGs by ICAO (AAL.png, DLH.png, etc.)
-│       └── README.md
+│   ├── fonts/               # TrueType fonts (Arial.ttf)
+│   ├── logos/               # 102+ Airline logo PNGs & aliases.json
+│   ├── plane/               # departure.png and landing.png icons
+│   └── sample_board.png
 ├── backend/
 │   ├── app/
 │   │   ├── __init__.py
 │   │   ├── config.py        # Settings via Pydantic & environment variables
+│   │   ├── flight_service.py # Flightradar24 API client & caching
 │   │   ├── main.py          # FastAPI application & endpoints
 │   │   ├── models.py        # Pydantic data schemas
-│   │   ├── opensky.py       # OpenSky API client with caching & flight sorting
-│   │   └── renderer.py      # Pillow high-contrast 1448x1072 e-ink renderer
-│   ├── Dockerfile           # Optimized Python 3.11-slim container build
+│   │   └── renderer.py      # Pillow high-contrast e-ink renderer
+│   ├── Dockerfile           # Multi-stage asset-protected Docker build
 │   └── requirements.txt
 ├── kindle/
 │   └── extensions/
 │       └── flightboard/
 │           ├── config.xml   # KUAL extension configuration
 │           ├── menu.json    # KUAL button definitions
+│           ├── config.env.example
 │           └── bin/
-│               ├── launch.sh        # Daemon background runner
-│               └── update_board.sh  # Main Kindle polling daemon script
+│               ├── launch.sh        # Daemon background runner & cvm unfreeze
+│               └── update_board.sh  # Main Kindle polling daemon script (cvm freeze)
 ├── docker-compose.yml       # Docker Compose setup
 ├── unraid-template.xml      # Unraid OS Docker XML template
 └── README.md
@@ -74,14 +79,15 @@ kindle-flight-board/
    git clone https://github.com/secof/kindle-flight-board.git
    cd kindle-flight-board
    ```
-2. Edit `docker-compose.yml` to set your target `AIRPORT_ICAO` (e.g. `KJFK`, `EGLL`, `KLAX`), timezone, and dimensions:
+2. Edit `docker-compose.yml` to set your target `AIRPORT_ICAO` (e.g. `LRBS`, `BGY`, `LTN`, `KJFK`), timezone, and dimensions:
    ```yaml
    environment:
-     - AIRPORT_ICAO=KJFK
-     - AIRPORT_NAME=John F. Kennedy Intl
-     - TIMEZONE=America/New_York
-     - BOARD_WIDTH=1448
-     - BOARD_HEIGHT=1072
+     - AIRPORT_ICAO=LRBS
+     - AIRPORT_NAME=Aeroportul Internațional București Băneasa
+     - TIMEZONE=Europe/Bucharest
+     - BOARD_WIDTH=800
+     - BOARD_HEIGHT=600
+     - ROTATE_DEGREES=90
    ```
 3. Start container:
    ```bash
@@ -92,7 +98,7 @@ kindle-flight-board/
 1. Copy `unraid-template.xml` into your Unraid server template folder:
    `/boot/config/plugins/dockerMan/templates-user/my-kindle-flight-board.xml`
 2. Go to **Docker** $\rightarrow$ **Add Container** in Unraid web UI and select `kindle-flight-board`.
-3. Set your target airport ICAO code and click **Apply**.
+3. Set your target airport ICAO code (e.g., `LRBS`, `BGY`) and click **Apply**.
 
 ---
 
@@ -109,16 +115,17 @@ kindle-flight-board/
    > [!IMPORTANT]
    > The path on your Kindle USB drive **MUST** be exactly:
    > `[Kindle USB Root]/extensions/flightboard/menu.json`
-   > (Do NOT copy as `extensions/kindle/extensions/flightboard` or `extensions/extensions/flightboard`).
 
-3. Set your server IP by creating or editing `config.env` inside `[Kindle USB Drive]/extensions/flightboard/config.env` (or `/mnt/us/flightboard.conf`):
+3. Set your server IP by editing `config.env` inside `[Kindle USB Drive]/extensions/flightboard/config.env`:
    ```sh
    SERVER_URL="http://192.168.1.100:8000"
    POLL_INTERVAL=60
    TOGGLE_WIFI=0
+   ROTATE=90
+   STOP_FRAMEWORK=1
    ```
 4. Safely eject your Kindle USB drive.
-5. Exit KUAL if it was open, then re-open **KUAL** on your Kindle. You will now see **Kindle Flight Board** listed in the menu!
+5. Open **KUAL** on your Kindle, tap **Kindle Flight Board** $\rightarrow$ **Update Board Once** (or **Start Flight Board Daemon**).
 
 ---
 
@@ -126,25 +133,24 @@ kindle-flight-board/
 
 | Environment Variable | Default | Description |
 | :--- | :--- | :--- |
-| `AIRPORT_ICAO` | `KJFK` | Target airport ICAO code (e.g., `KLAX`, `EGLL`, `EDDF`) |
-| `AIRPORT_NAME` | `John F. Kennedy Intl` | Display title on board header |
-| `TIMEZONE` | `America/New_York` | Target timezone for departure/arrival timestamps |
-| `BOARD_WIDTH` | `1448` | Native Kindle display width in landscape pixels |
-| `BOARD_HEIGHT` | `1072` | Native Kindle display height in landscape pixels |
-| `ROTATE_DEGREES` | `0` | Image rotation (0, 90, 180, 270) |
-| `INVERT_COLORS` | `false` | Invert colors for dark mode e-ink display |
-| `OPENSKY_USERNAME` | `""` | Optional OpenSky Network API username |
-| `OPENSKY_PASSWORD` | `""` | Optional OpenSky Network API password |
+| `AIRPORT_ICAO` | `LRBS` | Target airport ICAO code (e.g. `LRBS`, `BGY`, `LTN`, `KJFK`) |
+| `AIRPORT_NAME` | `Aeroportul Internațional București Băneasa` | Display title for airport header |
+| `TIMEZONE` | `Europe/Bucharest` | Target timezone for departure/arrival timestamps |
+| `BOARD_WIDTH` | `800` | Native Kindle display width in pixels |
+| `BOARD_HEIGHT` | `600` | Native Kindle display height in pixels |
+| `ROTATE_DEGREES` | `90` | Image rotation (0, 90, 180, 270) |
+| `INVERT_COLORS` | `false` | Invert black/white for dark mode e-ink display |
+| `CACHE_TTL_SECONDS` | `300` | Server cache duration in seconds |
 
 ---
 
 ## 🧪 API Endpoints
 
-- `GET /changed?hash=<HASH>`: Returns `{ "changed": true|false, "data_hash": "..." }`
 - `GET /board.png`: Returns high-contrast PNG image (`?force_refresh=true` or `?rotate=90`)
-- `GET/POST /refresh`: Bypasses cache and forces immediate re-fetch from FlightRadar24 API
+- `GET/POST /refresh`: Bypasses cache and forces immediate re-fetch from Flightradar24 API
+- `GET /changed?hash=<HASH>`: Returns `{ "changed": true|false, "data_hash": "..." }`
 - `GET /api/flights`: Returns raw JSON flight data
-- `GET /status`: Returns last FlightRadar24 API call, HTTP response/payload, and app settings
+- `GET /status`: Returns last Flightradar24 API call status, HTTP response payload, and settings
 - `GET /health`: Container health check
 
 ---
